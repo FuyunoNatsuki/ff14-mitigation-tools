@@ -1,0 +1,40 @@
+'use strict';
+// 軽減スキルの一覧。パッチで数値が変わったらここを直します。
+// id はプランの保存に使うので変えないでください。abbr はアイコンに出す略称、jobs は使えるジョブです。
+// ===== 軽減データ（7.x）: p=物理%, m=魔法%, d=効果秒, r=リキャスト秒, kind: party=全員 / self=自分 / single=味方1人 =====
+const TANKS = ['PLD','WAR','DRK','GNB'];
+const MITS = [
+  {id:'reprisal',  abbr:'リプ', name:'リプライザル',             p:10,m:10,d:15,r:60, kind:'party', jobs:TANKS},
+  {id:'rampart',   abbr:'ラン', name:'ランパート',               p:20,m:20,d:20,r:90, kind:'self',  jobs:TANKS},
+  {id:'poa',       abbr:'パセ', name:'パッセージ・オブ・アームズ', p:15,m:15,d:18,r:120,kind:'party', jobs:['PLD']},
+  {id:'guardian',  abbr:'ガデ', name:'ガーディアン',             p:40,m:40,d:15,r:120,kind:'self',  jobs:['PLD']},
+  {id:'hsheltron', abbr:'シェ', name:'ホーリーシェルトロン',     p:15,m:15,d:8, r:5,  kind:'self',  jobs:['PLD']},
+  {id:'intervention',abbr:'イン',name:'インターベンション',      p:10,m:10,d:8, r:10, kind:'single',jobs:['PLD']},
+  {id:'damnation', abbr:'ダム', name:'ダムネーション',           p:40,m:40,d:15,r:120,kind:'self',  jobs:['WAR']},
+  {id:'bloodwhet', abbr:'血気', name:'原初の血気',               p:10,m:10,d:8, r:25, kind:'self',  jobs:['WAR']},
+  {id:'dm',        abbr:'ミシ', name:'ダークミッショナリー',     p:5, m:10,d:15,r:90, kind:'party', jobs:['DRK']},
+  {id:'vigil',     abbr:'ヴィ', name:'シャドウヴィジル',         p:40,m:40,d:15,r:120,kind:'self',  jobs:['DRK']},
+  {id:'darkmind',  abbr:'マイ', name:'ダークマインド',           p:10,m:20,d:10,r:60, kind:'self',  jobs:['DRK']},
+  {id:'oblation',  abbr:'オブ', name:'オブレーション',           p:10,m:10,d:10,r:60, kind:'single',jobs:['DRK'], charges:2},
+  {id:'hol',       abbr:'ハト', name:'ハート・オブ・ライト',     p:5, m:10,d:15,r:90, kind:'party', jobs:['GNB']},
+  {id:'nebula',    abbr:'ネビ', name:'グレートネビュラ',         p:40,m:40,d:15,r:120,kind:'self',  jobs:['GNB']},
+  {id:'corundum',  abbr:'コラ', name:'ハート・オブ・コランダム', p:15,m:15,d:8, r:25, kind:'self',  jobs:['GNB']},
+  {id:'camo',      abbr:'カモ', name:'カモフラージュ',           p:10,m:10,d:20,r:90, kind:'self',  jobs:['GNB']},
+  {id:'temperance',abbr:'テン', name:'テンパランス',             p:10,m:10,d:20,r:120,kind:'party', jobs:['WHM']},
+  {id:'aquaveil',  abbr:'アク', name:'アクアヴェール',           p:15,m:15,d:8, r:60, kind:'single',jobs:['WHM']},
+  {id:'soil',      abbr:'陣',   name:'野戦治療の陣',             p:10,m:10,d:15,r:30, kind:'party', jobs:['SCH']},
+  {id:'illum',     abbr:'イル', name:'フェイイルミネーション',   p:0, m:5, d:20,r:120,kind:'party', jobs:['SCH']},
+  {id:'cu',        abbr:'運命', name:'運命の輪',                 p:10,m:10,d:5, r:60, kind:'party', jobs:['AST']},
+  {id:'exalt',     abbr:'エク', name:'エクサルテーション',       p:10,m:10,d:8, r:60, kind:'single',jobs:['AST']},
+  {id:'kera',      abbr:'ケラ', name:'ケーラコレ',               p:10,m:10,d:15,r:30, kind:'party', jobs:['SGE']},
+  {id:'holos',     abbr:'ホリ', name:'ホーリズム',               p:10,m:10,d:20,r:120,kind:'party', jobs:['SGE']},
+  {id:'tauro',     abbr:'タウ', name:'タウロコレ',               p:10,m:10,d:15,r:45, kind:'single',jobs:['SGE']},
+  {id:'feint',     abbr:'牽制', name:'牽制',                     p:10,m:5, d:15,r:90, kind:'party', jobs:['MNK','DRG','NIN','SAM','RPR','VPR']},
+  {id:'riddle',    abbr:'金剛', name:'金剛の極意',               p:20,m:20,d:10,r:120,kind:'self',  jobs:['MNK']},
+  {id:'tengentsu', abbr:'心眼', name:'天眼通',                   p:10,m:10,d:4, r:15, kind:'self',  jobs:['SAM']},
+  {id:'trou',      abbr:'トル', name:'トルバドゥール',           p:15,m:15,d:15,r:90, kind:'party', jobs:['BRD']},
+  {id:'tact',      abbr:'タク', name:'タクティシャン',           p:15,m:15,d:15,r:90, kind:'party', jobs:['MCH']},
+  {id:'samba',     abbr:'サン', name:'守りのサンバ',             p:15,m:15,d:15,r:90, kind:'party', jobs:['DNC']},
+  {id:'addle',     abbr:'アド', name:'アドル',                   p:5, m:10,d:15,r:90, kind:'party', jobs:['BLM','SMN','RDM','PCT']},
+  {id:'barrier',   abbr:'バリ', name:'マジックバリア',           p:0, m:10,d:10,r:120,kind:'party', jobs:['RDM']},
+];

@@ -1,0 +1,6 @@
+# build.ps1 で作る1ファイル版（デスクトップ用と claude.ai 公開用）
+dist/
+online/
+.claude/
+# データベースのURLなど、公開しない手元の設定（見本は config.example.js）
+config.js

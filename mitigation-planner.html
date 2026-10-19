@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Mitigation Planner</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="css/planner.css">
+<script src="config.js"></script>
+<script src="data/job-data.js"></script>
+<script src="data/mitigations.js"></script>
+</head>
+<body>
+<div class="wrap" id="app">
+  <header>
+    <h1><small>FINAL FANTASY XIV 軽減プランナー</small>Mitigation Planner</h1>
+    <div class="formula">予測被ダメ = 元ダメージ × Π(1−軽減) × 不屈 × 防御力</div>
+  </header>
+
+  <section class="card">
+    <div class="share-bar">
+      <div class="row" style="align-items:center;gap:10px">
+        <span class="mode local" id="modeBadge">ローカル</span>
+        <span class="sub" id="modeText">このブラウザだけで保存されます。</span>
+      </div>
+      <div class="peers" id="peers"></div>
+    </div>
+    <div class="divider"></div>
+
+    <div id="fflogsBox">
+      <h2>ログの読み込み（FF Logs）</h2>
+      <div class="row">
+        <label class="f grow" for="url">FF Logs のレポートURL
+          <input type="text" id="url" placeholder="https://ja.fflogs.com/reports/AbCdEf123456#fight=5"></label>
+        <label class="f fight-sel" for="fight" style="width:260px">戦闘
+          <select id="fight" disabled><option>URLを読み込むと選べます</option></select></label>
+        <button class="btn" id="load" type="button">読み込む</button>
+      </div>
+      <div class="row" id="loginRow" hidden style="margin-top:10px;align-items:center">
+        <span class="sub" id="loginState">ログを読み込むには FF Logs へのログインが必要です。</span>
+        <button class="btn small" id="loginBtn" type="button">FF Logs でログイン</button>
+        <button class="btn ghost small" id="logoutBtn" type="button" hidden>ログアウト</button>
+      </div>
+      <details class="cred" id="credBox">
+        <summary>FF Logs API クライアント（初回のみ設定）</summary>
+        <div class="row">
+          <label class="f grow" for="cid">クライアントID<input type="text" id="cid" autocomplete="off"></label>
+          <label class="f grow" for="csec">クライアントシークレット<input type="password" id="csec" autocomplete="off"></label>
+          <label class="toggle" for="remember"><input type="checkbox" id="remember" checked> このブラウザに保存</label>
+        </div>
+        <p class="note">FF Logs にログインして <a href="https://www.fflogs.com/api/clients/" target="_blank" rel="noopener">API Clients</a> で「Create Client」を押すと発行されます（名前は自由、Redirect URL は空欄でかまいません）。キーはこのブラウザ内だけに保存され、FF Logs 以外には送信しません。</p>
+      </details>
+      <div class="divider"></div>
+    </div>
+
+    <div id="roomBox">
+      <h2>みんなで編集（URLで共有）</h2>
+      <div class="row">
+        <label class="f" for="nick" style="width:200px">あなたの名前（ほかの人に表示）
+          <input type="text" id="nick" maxlength="20" placeholder="例: ナイト担当"></label>
+      </div>
+      <div id="roomOff">
+        <div class="row" style="margin-top:10px;align-items:center">
+          <button class="btn" id="roomCreate" type="button">共有ルームを作る</button>
+          <span class="sub">今表示している戦闘・メンバー・プランでルームを作り、共有リンクを発行します。</span>
+        </div>
+        <div class="row" style="margin-top:10px">
+          <label class="f" for="roomCode" style="width:240px">ルームIDで参加
+            <input type="text" id="roomCode" placeholder="例: k3v6q2rt7wac" autocomplete="off"></label>
+          <button class="btn ghost" id="roomJoin" type="button">参加する</button>
+        </div>
+      </div>
+      <div id="roomOn" hidden>
+        <div class="row" style="margin-top:10px;align-items:center">
+          <span>ルームID <strong id="roomIdView" style="font-family:var(--f-display)"></strong></span>
+          <input type="text" id="roomLink" readonly aria-label="共有リンク" style="flex:1 1 320px;width:auto">
+          <button class="btn small" id="roomCopy" type="button">リンクをコピー</button>
+          <button class="btn ghost small" id="roomLeave" type="button">ルームから抜ける</button>
+        </div>
+        <p class="note" id="roomNote">このリンクを開いた人は、アカウントなしで誰でも編集できます。リンクは信頼できるメンバーにだけ渡してください。</p>
+      </div>
+      <div class="divider"></div>
+    </div>
+
+    <div id="sharedBox" hidden>
+      <h2>共有中の戦闘</h2>
+      <div class="row">
+        <label class="f grow" for="sharedFight">みんなで見ている戦闘（切り替えると全員の画面が切り替わります）
+          <select id="sharedFight"><option value="">まだ戦闘データがありません</option></select></label>
+      </div>
+      <p class="note">FF Logs からの取得はこのページからはできません。公開版やHTMLファイルでログを読み込み、「データを書き出す」で保存したファイルを下の「データを読み込む」で取り込んでください。</p>
+      <div class="divider"></div>
+    </div>
+
+    <div class="row" style="align-items:center">
+      <button class="btn ghost small" id="importBtn" type="button">データを読み込む</button>
+      <button class="btn ghost small" id="exportBtn" type="button">データを書き出す</button>
+      <button class="btn ghost small" id="demo" type="button">サンプルで試す</button>
+      <input type="file" id="importFile" accept=".json,application/json" hidden>
+      <span class="sub">書き出したファイルには戦闘データ・メンバー・軽減プランが入ります。</span>
+    </div>
+    <div class="status" id="status" role="status"></div>
+  </section>
+
+  <section class="card" id="memberCard">
+    <div class="tl-tools">
+      <h2 style="margin:0">メンバー</h2>
+      <div class="row" style="gap:10px;align-items:center">
+        <label class="f" for="partySize" style="flex-direction:row;align-items:center;gap:6px">参加人数
+          <select id="partySize" style="width:auto"></select></label>
+      </div>
+    </div>
+    <div class="tbl-wrap"><table class="mtable">
+      <thead><tr><th>#</th><th>ジョブ</th><th>名前</th><th>ログのプレイヤー</th><th class="num">最大HP</th><th class="num">クリ</th><th class="num">意思</th><th class="num">不屈</th><th class="num">信仰</th><th class="num">SS</th><th class="num">物理防御</th><th class="num">魔法防御</th></tr></thead>
+      <tbody id="mbody"></tbody>
+    </table></div>
+    <p class="note">空欄の項目はジョブごとの標準値（<code>data/job-data.js</code> で管理）を使います。最大HPはログにHPがあればログの値が標準になります。被ダメージの計算に使うのは最大HP・不屈・物理防御・魔法防御で、クリ・意思・信仰・SSは記録用です。物理防御・魔法防御は「防御力の軽減を入れる」をオンにしたときだけ、入力のあるメンバーに掛かります。</p>
+  </section>
+
+  <section class="card" id="sumCard">
+    <div class="summary" id="summary"></div>
+  </section>
+
+  <section class="card" id="planCard">
+    <h2>軽減タイムライン</h2>
+    <div class="palette" id="palette"></div>
+    <div class="tl-tools">
+      <span class="insert-at" id="insertAt"></span>
+      <div class="row" style="gap:10px;align-items:center">
+        <label class="toggle" for="ten"><input type="checkbox" id="ten"> 不屈の被ダメ軽減を入れる</label>
+        <label class="toggle" for="defOn" title="元ダメージが防御力を引く前の値のときにオンにします"><input type="checkbox" id="defOn"> 防御力の軽減を入れる</label>
+        <label class="toggle" for="trait"><input type="checkbox" id="trait"> タンク特性(−20%)を追加で掛ける</label>
+        <label class="f" for="zoom" style="flex-direction:row;align-items:center;gap:6px">拡大
+          <select id="zoom" style="width:auto"><option value="4">小</option><option value="8" selected>中</option><option value="14">大</option></select></label>
+        <button class="btn danger small" id="clearPlan" type="button">全消去</button>
+      </div>
+    </div>
+    <div class="tl-outer" id="tlOuter"><div class="tl" id="tl"></div></div>
+    <div class="legend" style="margin-top:10px">
+      <span style="--c:var(--ok)">全員生存</span><span style="--c:var(--warn)">残り15%未満</span><span style="--c:var(--bad)">戦闘不能あり</span><span style="--c:var(--muted)">有効サンプルなし</span>
+      <span style="--c:var(--lane-party)">全体軽減</span><span style="--c:var(--lane-self)">自分だけ</span><span style="--c:var(--lane-single)">味方1人</span><span style="--c:var(--lane-custom)">自由入力</span>
+    </div>
+    <div class="edit" id="editBox" hidden></div>
+    <p class="note">攻撃の目盛りか下の表の行をクリックすると、その時刻が軽減の配置位置になります。上のアイコンを押すと、そのメンバーの軽減が配置されます。バーはドラッグで移動、クリックで編集できます。バーの下の薄い線はリキャスト、斜線のバーはリキャスト中の重複です。</p>
+  </section>
+
+  <section class="card">
+    <div class="tl-tools">
+      <h2 style="margin:0">攻撃ごとの予測</h2>
+      <div class="row" style="gap:10px;align-items:center">
+        <label class="f" for="minDmg" style="flex-direction:row;align-items:center;gap:6px;white-space:nowrap">元ダメージ下限
+          <input type="number" id="minDmg" min="0" step="5000" style="width:110px"></label>
+        <label class="f" for="scope" style="flex-direction:row;align-items:center;gap:6px">対象
+          <select id="scope" style="width:auto"><option value="all">すべて</option><option value="aoe">4人以上に当たる攻撃</option><option value="tb">タンクへの攻撃</option></select></label>
+      </div>
+    </div>
+    <div class="tbl-wrap"><table class="pred">
+      <thead><tr><th>時刻</th><th>攻撃</th><th>種別</th><th class="num">人数</th><th class="num">元ダメ（上書き可）</th><th>有効な軽減</th><th class="num">予測被ダメ(最大)</th><th class="num">最小残りHP</th><th>判定</th></tr></thead>
+      <tbody id="tbody"></tbody>
+    </table></div>
+    <p class="note">元ダメージはログの「軽減前ダメージ」です。欄に数値を入れると、その攻撃の元ダメージ（1人あたり）として、ログの値より優先して使います（ルームでは全員に共有されます）。空にするとログの値に戻ります。バリアで吸収されたヒットはサンプルから除外し、同じ攻撃で当たった他のメンバーの値（中央値）で補います（<span class="est">推定</span>表示）。</p>
+  </section>
+
+  <footer>軽減率と効果時間はパッチ7.x（黄金のレガシー）時点の値です。被ダメージの±5%程度のブレと、回復・HP減少中の状態は計算に入れていません。不屈と防御力の軽減はLv100の計算式（不屈は420を基準、防御力は 15×防御力÷2780 %）です。FF Logs の元ダメージに防御力の分がすでに含まれていると思われる場合は「防御力の軽減を入れる」をオフのままにしてください。FF Logs の元ダメージにタンク特性の20%が含まれていないと感じたら「タンク特性を追加で掛ける」をオンにしてください。行を開くと実際のダメージと比べられます。</footer>
+</div>
+
+<script src="js/constants.js"></script>
+<script src="js/state.js"></script>
+<script src="js/members.js"></script>
+<script src="js/fflogs.js"></script>
+<script src="js/fight.js"></script>
+<script src="js/calc.js"></script>
+<script src="js/render.js"></script>
+<script src="js/store-local.js"></script>
+<script src="js/sync-claude.js"></script>
+<script src="js/sync-room.js"></script>
+<script src="js/peers.js"></script>
+<script src="js/events.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,402 @@
+<title>FF14 被ダメージ計算機</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
+<style>
+/* Layout: 左に攻撃と軽減の入力、右にロール別の結果パネル（狭い画面では結果を先頭に） */
+:root{
+  --bg:#eef1f6; --panel:#ffffff; --line:#d5dbe6; --fg:#1b2333; --muted:#5d687c;
+  --accent:#2f5fd0; --accent-soft:#e3eafb;
+  --phys:#c4641a; --phys-soft:#fbeadb; --mag:#7a48c8; --mag-soft:#efe6fb;
+  --ok:#1f8a55; --warn:#b77a00; --bad:#c8323a; --shield:#d9a514;
+  --hpbar:#3aa86b; --track:#e5e9f0;
+  --f-display:"Chakra Petch","Zen Kaku Gothic New",system-ui,sans-serif;
+  --f-body:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic UI",system-ui,sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#10141d; --panel:#181e2a; --line:#2a3344; --fg:#e4e9f2; --muted:#94a0b5;
+  --accent:#7aa2ff; --accent-soft:#1f2a45;
+  --phys:#f0995a; --phys-soft:#3a2617; --mag:#b991f5; --mag-soft:#2c2140;
+  --ok:#4cc68a; --warn:#e9b440; --bad:#ff6b72; --shield:#f0c43c;
+  --hpbar:#45b97a; --track:#252d3c; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#10141d; --panel:#181e2a; --line:#2a3344; --fg:#e4e9f2; --muted:#94a0b5;
+  --accent:#7aa2ff; --accent-soft:#1f2a45;
+  --phys:#f0995a; --phys-soft:#3a2617; --mag:#b991f5; --mag-soft:#2c2140;
+  --ok:#4cc68a; --warn:#e9b440; --bad:#ff6b72; --shield:#f0c43c;
+  --hpbar:#45b97a; --track:#252d3c; color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:14px;line-height:1.6}
+.wrap{max-width:1180px;margin:0 auto;padding-block:28px 48px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:22px}
+h1{font-family:var(--f-display);font-weight:700;font-size:1.75rem;letter-spacing:.02em;margin:0;text-wrap:balance}
+h1 small{display:block;font-family:var(--f-body);font-size:.8rem;font-weight:500;color:var(--muted);letter-spacing:.08em}
+.formula{font-family:var(--f-display);font-size:.82rem;color:var(--muted);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:6px 10px}
+
+.grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,440px);gap:20px;align-items:start}
+.results{position:sticky;top:calc(env(safe-area-inset-top,0px) + 12px)}
+@media (max-width:900px){.grid{grid-template-columns:minmax(0,1fr)}.results{position:static;order:-1}}
+
+section.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px}
+.stack{display:flex;flex-direction:column;gap:16px}
+h2{font-size:.78rem;letter-spacing:.14em;font-weight:700;color:var(--muted);margin:0 0 12px;text-transform:uppercase}
+h3{font-size:.85rem;margin:0 0 8px;font-weight:700}
+
+.fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px}
+label.f{display:flex;flex-direction:column;gap:4px;font-size:.78rem;color:var(--muted);font-weight:500}
+input[type=number],select{font:inherit;font-family:var(--f-display);font-size:1rem;font-weight:600;color:var(--fg);
+  background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:7px 10px;width:100%;font-variant-numeric:tabular-nums}
+input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.seg{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--bg)}
+.seg button{flex:1;font:inherit;font-weight:700;border:0;background:transparent;color:var(--muted);padding:8px 6px;cursor:pointer}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button[aria-pressed=true][data-v=phys]{background:var(--phys-soft);color:var(--phys)}
+.seg button[aria-pressed=true][data-v=mag]{background:var(--mag-soft);color:var(--mag)}
+.seg button[aria-pressed=true][data-v=unique]{background:var(--accent-soft);color:var(--accent)}
+
+.group{display:flex;flex-direction:column;gap:8px}
+.group+.group{margin-top:14px;padding-top:14px;border-top:1px dashed var(--line)}
+.group-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.group-head span{font-size:.75rem;color:var(--muted)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font:inherit;font-size:.82rem;display:inline-flex;align-items:center;gap:6px;cursor:pointer;
+  border:1px solid var(--line);background:var(--bg);color:var(--fg);border-radius:999px;padding:4px 10px 4px 8px}
+.chip .job{font-size:.68rem;font-weight:700;color:var(--muted);min-width:1.6em}
+.chip .val{font-family:var(--f-display);font-size:.74rem;font-weight:600;color:var(--muted)}
+.chip[aria-pressed=true]{background:var(--accent-soft);border-color:var(--accent);color:var(--fg)}
+.chip[aria-pressed=true] .val{color:var(--accent)}
+.chip.inactive{opacity:.45}
+.chip.inactive .val{text-decoration:line-through}
+.note{font-size:.75rem;color:var(--muted);margin:6px 0 0}
+
+.toggle{display:flex;align-items:center;gap:8px;font-size:.85rem;cursor:pointer}
+.toggle input{width:16px;height:16px;accent-color:var(--accent)}
+
+/* results */
+.sum{display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.sum .big{font-family:var(--f-display);font-size:2.1rem;font-weight:700;line-height:1;font-variant-numeric:tabular-nums}
+.sum .lbl{font-size:.75rem;color:var(--muted);letter-spacing:.08em}
+.verdict{font-weight:700;font-size:.85rem;padding:4px 12px;border-radius:999px}
+.verdict.ok{color:var(--ok);background:color-mix(in srgb,var(--ok) 14%,transparent)}
+.verdict.bad{color:var(--bad);background:color-mix(in srgb,var(--bad) 14%,transparent)}
+.verdict.warn{color:var(--warn);background:color-mix(in srgb,var(--warn) 16%,transparent)}
+
+.role{border-top:1px solid var(--line);padding-top:14px;margin-top:14px;display:flex;flex-direction:column;gap:8px}
+.role-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.role-name{font-weight:700;display:flex;align-items:center;gap:8px}
+.role-name i{font-style:normal;font-family:var(--f-display);font-size:.7rem;font-weight:700;color:#fff;border-radius:4px;padding:1px 6px}
+.r-tank i{background:#3767c9}.r-heal i{background:#3f9a5a}.r-dps i{background:#b8434d}
+.pill{font-size:.72rem;font-weight:700;padding:2px 9px;border-radius:999px}
+.pill.ok{color:var(--ok);background:color-mix(in srgb,var(--ok) 14%,transparent)}
+.pill.warn{color:var(--warn);background:color-mix(in srgb,var(--warn) 16%,transparent)}
+.pill.bad{color:var(--bad);background:color-mix(in srgb,var(--bad) 14%,transparent)}
+.hp-in{display:flex;align-items:center;gap:8px;font-size:.75rem;color:var(--muted)}
+.hp-in input{width:120px;padding:3px 8px;font-size:.88rem}
+
+.bar{position:relative;height:14px;background:var(--track);border-radius:4px;overflow:hidden}
+.bar .hp{position:absolute;inset:0 auto 0 0;background:var(--hpbar)}
+.bar .dmg{position:absolute;top:0;bottom:0;background:repeating-linear-gradient(135deg,var(--bad) 0 4px,color-mix(in srgb,var(--bad) 60%,transparent) 4px 8px)}
+.bar .sh{position:absolute;top:0;height:4px;background:var(--shield)}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.stats div{display:flex;flex-direction:column}
+.stats b{font-family:var(--f-display);font-weight:600;font-size:.98rem;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stats span{font-size:.68rem;color:var(--muted)}
+.hint{font-size:.76rem;color:var(--muted)}
+.hint strong{color:var(--fg);font-family:var(--f-display)}
+@media (max-width:420px){.stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:.72rem;color:var(--muted);margin-top:14px}
+.legend span::before{content:"";display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px;background:var(--c)}
+.reset{font:inherit;font-size:.78rem;border:1px solid var(--line);background:transparent;color:var(--muted);border-radius:6px;padding:4px 10px;cursor:pointer}
+footer{margin-top:26px;font-size:.75rem;color:var(--muted);max-width:70ch}
+@media (prefers-reduced-motion:no-preference){.bar .hp,.bar .dmg,.bar .sh{transition:all .25s ease}}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1><small>FINAL FANTASY XIV · 7.x</small>被ダメージ計算機</h1>
+    <div class="formula">被ダメ = 素ダメ × (1+被ダメ上昇) × Π(1−軽減) − バリア</div>
+  </header>
+
+  <div class="grid">
+    <div class="stack">
+      <section class="card">
+        <h2>攻撃</h2>
+        <div class="stack">
+          <div class="seg" role="group" aria-label="ダメージ種別" id="dtype">
+            <button type="button" data-v="phys">物理</button>
+            <button type="button" data-v="mag">魔法</button>
+            <button type="button" data-v="unique">特殊（属性なし）</button>
+          </div>
+          <div class="fields">
+            <label class="f" for="raw">素ダメージ（軽減前）
+              <input type="number" id="raw" min="0" step="1000" inputmode="numeric"></label>
+            <label class="f" for="vuln">被ダメージ上昇（%）
+              <input type="number" id="vuln" min="0" step="5" inputmode="numeric"></label>
+            <label class="f" for="hits">ヒット数（同じ攻撃を連続）
+              <input type="number" id="hits" min="1" max="10" step="1" inputmode="numeric"></label>
+          </div>
+          <p class="note">素ダメージは FF Logs の「軽減前ダメージ（Unmitigated）」などを入れてください。特殊ダメージには物理・魔法専用の軽減が効きません。</p>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>軽減</h2>
+        <div id="mitGroups"></div>
+        <div class="group">
+          <div class="group-head"><h3>自由入力</h3><span>全員に乗算で適用</span></div>
+          <div class="fields">
+            <label class="f" for="custom1">追加軽減 1（%）<input type="number" id="custom1" min="0" max="100" step="1"></label>
+            <label class="f" for="custom2">追加軽減 2（%）<input type="number" id="custom2" min="0" max="100" step="1"></label>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>バリア</h2>
+        <div class="stack">
+          <div class="fields">
+            <label class="f" for="shAll">全員のバリア（固定値）<input type="number" id="shAll" min="0" step="1000"></label>
+            <label class="f" for="shTank">タンクのみ追加バリア（固定値）<input type="number" id="shTank" min="0" step="1000"></label>
+          </div>
+          <div class="chips" id="shieldChips"></div>
+          <p class="note">鼓舞・パンハイマ・ニュートラルセクトなど回復力依存のバリアは、実際の量を固定値に入れてください。</p>
+        </div>
+      </section>
+    </div>
+
+    <aside class="results">
+      <section class="card">
+        <div class="sum">
+          <div><div class="lbl">パーティ全体の判定</div><div class="big" id="sumBig">—</div></div>
+          <span class="verdict" id="verdict">—</span>
+        </div>
+        <label class="toggle" for="trait"><input type="checkbox" id="trait"> タンクの特性（被ダメージ −20%）を適用</label>
+        <div id="roles"></div>
+        <div class="legend">
+          <span style="--c:var(--hpbar)">残りHP</span>
+          <span style="--c:var(--bad)">受けるダメージ</span>
+          <span style="--c:var(--shield)">バリア</span>
+        </div>
+        <div style="margin-top:14px;display:flex;justify-content:flex-end"><button class="reset" type="button" id="reset">例に戻す</button></div>
+      </section>
+    </aside>
+  </div>
+
+  <footer>軽減率はパッチ7.x（黄金のレガシー）時点の値です。パッチで変わることがあるので、違っていれば自由入力で補正してください。端数処理や攻撃ごとのブレ（±5%程度）は含みません。HPの初期値は例です。</footer>
+</div>
+
+<script>
+// p: 物理軽減率, m: 魔法軽減率（%）。who: party=全員 / tank=タンクのみ
+const MITS = [
+  {g:'敵へのデバフ', items:[
+    {id:'reprisal', job:'盾', name:'リプライザル', p:10, m:10, who:'party'},
+    {id:'addle', job:'魔', name:'アドル', p:5, m:10, who:'party'},
+    {id:'feint', job:'近', name:'牽制', p:10, m:5, who:'party'},
+  ]},
+  {g:'タンクの全体軽減', items:[
+    {id:'poa', job:'ナ', name:'パッセージ・オブ・アームズ', p:15, m:15, who:'party'},
+    {id:'hol', job:'ガ', name:'ハート・オブ・ライト', p:5, m:10, who:'party'},
+    {id:'dm', job:'暗', name:'ダークミッショナリー', p:5, m:10, who:'party'},
+  ]},
+  {g:'ヒーラーの全体軽減', items:[
+    {id:'temperance', job:'白', name:'テンパランス', p:10, m:10, who:'party'},
+    {id:'soil', job:'学', name:'野戦治療の陣', p:10, m:10, who:'party'},
+    {id:'illum', job:'学', name:'フェイイルミネーション', p:0, m:5, who:'party'},
+    {id:'cu', job:'占', name:'運命の輪', p:10, m:10, who:'party'},
+    {id:'kera', job:'賢', name:'ケーラコレ', p:10, m:10, who:'party'},
+    {id:'holos', job:'賢', name:'ホーリズム', p:10, m:10, who:'party'},
+  ]},
+  {g:'DPSの全体軽減', items:[
+    {id:'trou', job:'詩', name:'トルバドゥール', p:15, m:15, who:'party'},
+    {id:'tact', job:'機', name:'タクティシャン', p:15, m:15, who:'party'},
+    {id:'samba', job:'踊', name:'守りのサンバ', p:15, m:15, who:'party'},
+    {id:'barrier', job:'赤', name:'マジックバリア', p:0, m:10, who:'party'},
+  ]},
+  {g:'タンク個人の軽減', items:[
+    {id:'rampart', job:'盾', name:'ランパート', p:20, m:20, who:'tank'},
+    {id:'guardian', job:'ナ', name:'ガーディアン', p:40, m:40, who:'tank'},
+    {id:'hsheltron', job:'ナ', name:'ホーリーシェルトロン', p:15, m:15, who:'tank'},
+    {id:'damnation', job:'戦', name:'ダムネーション', p:40, m:40, who:'tank'},
+    {id:'bloodwhet', job:'戦', name:'原初の血気', p:10, m:10, who:'tank'},
+    {id:'vigil', job:'暗', name:'シャドウヴィジル', p:40, m:40, who:'tank'},
+    {id:'darkmind', job:'暗', name:'ダークマインド', p:10, m:20, who:'tank'},
+    {id:'oblation', job:'暗', name:'オブレーション', p:10, m:10, who:'tank'},
+    {id:'nebula', job:'ガ', name:'グレートネビュラ', p:40, m:40, who:'tank'},
+    {id:'corundum', job:'ガ', name:'ハート・オブ・コランダム', p:15, m:15, who:'tank'},
+    {id:'camo', job:'ガ', name:'カモフラージュ', p:10, m:10, who:'tank'},
+  ]},
+];
+// 最大HP比のバリア
+const SHIELDS = [
+  {id:'sio', job:'戦', name:'シェイクオフ', pct:15, who:'party'},
+  {id:'veil', job:'ナ', name:'ディヴァインヴェール', pct:10, who:'party', base:'tank'},
+  {id:'tbn', job:'暗', name:'ブラックナイト', pct:25, who:'tank'},
+];
+const ROLES = [
+  {key:'tank', cls:'r-tank', tag:'T', name:'タンク'},
+  {key:'heal', cls:'r-heal', tag:'H', name:'ヒーラー'},
+  {key:'dps',  cls:'r-dps',  tag:'D', name:'DPS'},
+];
+const EXAMPLE = {
+  dtype:'mag', raw:210000, vuln:0, hits:1, custom1:0, custom2:0, shAll:0, shTank:0, trait:true,
+  on:['reprisal','addle','hol','kera'], shOn:[],
+  hp:{tank:290000, heal:172000, dps:178000},
+};
+const KEY = 'ff14-dmg-calc-v1';
+let S;
+try { S = JSON.parse(localStorage.getItem(KEY)) } catch(e) {}
+if (!S || !S.hp) S = structuredClone(EXAMPLE);
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)) } catch(e) {} };
+
+const $ = id => document.getElementById(id);
+const fmt = n => Math.round(n).toLocaleString('ja-JP');
+const allMits = MITS.flatMap(g => g.items);
+
+// 種別に対する軽減率（特殊は物理・魔法で同じ値のものだけ有効）
+function rate(mit, t){
+  if (t === 'phys') return mit.p;
+  if (t === 'mag') return mit.m;
+  return mit.p === mit.m ? mit.p : 0;
+}
+function valLabel(mit){ return mit.p === mit.m ? mit.p + '%' : `物${mit.p}/魔${mit.m}%`; }
+
+function buildControls(){
+  $('mitGroups').innerHTML = MITS.map(g => `
+    <div class="group">
+      <div class="group-head"><h3>${g.g}</h3><span>${g.items[0].who === 'tank' ? 'タンクにだけ適用' : '全員に適用'}</span></div>
+      <div class="chips">${g.items.map(m => `
+        <button type="button" class="chip" id="mit-${m.id}" data-id="${m.id}">
+          <span class="job">${m.job}</span>${m.name}<span class="val">${valLabel(m)}</span>
+        </button>`).join('')}</div>
+    </div>`).join('');
+  $('shieldChips').innerHTML = SHIELDS.map(s => `
+    <button type="button" class="chip" id="sh-${s.id}" data-sh="${s.id}">
+      <span class="job">${s.job}</span>${s.name}<span class="val">${s.base==='tank'?'ナイトの':''}HP${s.pct}%${s.who==='tank'?'・T':''}</span>
+    </button>`).join('');
+  $('roles').innerHTML = ROLES.map(r => `
+    <div class="role ${r.cls}" id="role-${r.key}">
+      <div class="role-top">
+        <span class="role-name"><i>${r.tag}</i>${r.name}</span>
+        <span class="pill" data-k="pill"></span>
+      </div>
+      <label class="hp-in" for="hp-${r.key}">最大HP <input type="number" id="hp-${r.key}" min="1" step="1000" data-hp="${r.key}"></label>
+      <div class="bar"><div class="hp" data-k="hp"></div><div class="dmg" data-k="dmg"></div><div class="sh" data-k="sh"></div></div>
+      <div class="stats">
+        <div><b data-k="taken"></b><span>被ダメージ</span></div>
+        <div><b data-k="mit"></b><span>総軽減率</span></div>
+        <div><b data-k="left"></b><span>残りHP</span></div>
+        <div><b data-k="cap"></b><span>耐えられる素ダメ</span></div>
+      </div>
+      <div class="hint" data-k="hint"></div>
+    </div>`).join('');
+}
+
+function syncInputs(){
+  document.querySelectorAll('#dtype button').forEach(b => b.setAttribute('aria-pressed', b.dataset.v === S.dtype));
+  for (const k of ['raw','vuln','hits','custom1','custom2','shAll','shTank']) $(k).value = S[k];
+  $('trait').checked = S.trait;
+  ROLES.forEach(r => $('hp-' + r.key).value = S.hp[r.key]);
+}
+
+function calc(){
+  const t = S.dtype;
+  const raw = Math.max(0, +S.raw || 0) * (1 + Math.max(0, +S.vuln || 0) / 100);
+  const hits = Math.min(10, Math.max(1, Math.floor(+S.hits || 1)));
+  const customMul = [S.custom1, S.custom2].reduce((a, v) => a * (1 - Math.min(100, Math.max(0, +v || 0)) / 100), 1);
+
+  // チップの有効/無効表示
+  allMits.forEach(m => {
+    const el = $('mit-' + m.id), on = S.on.includes(m.id);
+    el.setAttribute('aria-pressed', on);
+    el.classList.toggle('inactive', on && rate(m, t) === 0);
+  });
+  SHIELDS.forEach(s => $('sh-' + s.id).setAttribute('aria-pressed', S.shOn.includes(s.id)));
+
+  const out = ROLES.map(r => {
+    const hp = Math.max(1, +S.hp[r.key] || 1);
+    let mul = customMul;
+    for (const m of allMits) {
+      if (!S.on.includes(m.id)) continue;
+      if (m.who === 'tank' && r.key !== 'tank') continue;
+      mul *= 1 - rate(m, t) / 100;
+    }
+    if (r.key === 'tank' && S.trait) mul *= 0.8;
+    let shield = Math.max(0, +S.shAll || 0) + (r.key === 'tank' ? Math.max(0, +S.shTank || 0) : 0);
+    for (const s of SHIELDS) {
+      if (!S.shOn.includes(s.id)) continue;
+      if (s.who === 'tank' && r.key !== 'tank') continue;
+      const base = s.base === 'tank' ? Math.max(1, +S.hp.tank || 1) : hp;
+      shield += base * s.pct / 100;
+    }
+    const perHit = Math.floor(raw * mul);
+    const total = perHit * hits;
+    const throughShield = Math.max(0, total - shield);
+    const left = hp - throughShield;
+    // 1 HP 残すのに必要な最大の素ダメージ（被ダメ上昇込みで逆算）
+    const capRaw = (hp - 1 + shield) / (mul * hits) / (1 + Math.max(0, +S.vuln || 0) / 100);
+    // 生存に必要な追加軽減
+    const needMul = (hp - 1 + shield) / (raw * hits);
+    const extra = raw > 0 ? 1 - needMul / mul : 0;
+    return {r, hp, mul, shield, total, throughShield, left, capRaw, extra};
+  });
+  render(out, hits);
+  save();
+}
+
+function render(out, hits){
+  let dead = 0, low = 0;
+  out.forEach(o => {
+    const el = $('role-' + o.r.key), q = k => el.querySelector(`[data-k="${k}"]`);
+    const leftPct = Math.max(0, o.left / o.hp * 100);
+    const dmgPct = Math.min(100, o.throughShield / o.hp * 100);
+    const shPct = Math.min(100, o.shield / o.hp * 100);
+    q('hp').style.width = leftPct + '%';
+    q('dmg').style.left = leftPct + '%';
+    q('dmg').style.width = Math.min(dmgPct, 100 - leftPct) + '%';
+    q('sh').style.left = '0'; q('sh').style.width = shPct + '%';
+    q('taken').textContent = fmt(o.total);
+    q('mit').textContent = ((1 - o.mul) * 100).toFixed(1) + '%';
+    q('left').textContent = o.left > 0 ? fmt(o.left) : '0';
+    q('cap').textContent = fmt(o.capRaw);
+    const pill = q('pill');
+    if (o.left <= 0) { pill.className = 'pill bad'; pill.textContent = '戦闘不能'; dead++; }
+    else if (leftPct < 15) { pill.className = 'pill warn'; pill.textContent = `残り${leftPct.toFixed(0)}%`; low++; }
+    else { pill.className = 'pill ok'; pill.textContent = `残り${leftPct.toFixed(0)}%`; }
+    const sh = o.shield > 0 ? `バリア ${fmt(o.shield)} を含む。` : '';
+    q('hint').innerHTML = o.left <= 0
+      ? `${sh}生存にはあと <strong>${(o.extra * 100).toFixed(1)}%</strong> の軽減か、<strong>${fmt(-o.left + 1)}</strong> のバリアが必要。`
+      : `${sh}HPに余裕 <strong>${fmt(o.left - 1)}</strong>（素ダメで約 ${fmt(o.capRaw - S.raw)} まで増えても耐える）。`;
+  });
+  const v = $('verdict'), big = $('sumBig');
+  if (dead) { v.className = 'verdict bad'; v.textContent = `${dead}ロールが戦闘不能`; big.textContent = '危険'; big.style.color = 'var(--bad)'; }
+  else if (low) { v.className = 'verdict warn'; v.textContent = '全員生存（ギリギリ）'; big.textContent = '要注意'; big.style.color = 'var(--warn)'; }
+  else { v.className = 'verdict ok'; v.textContent = '全員生存'; big.textContent = '安全'; big.style.color = 'var(--ok)'; }
+}
+
+buildControls();
+syncInputs();
+calc();
+
+document.addEventListener('click', e => {
+  const seg = e.target.closest('#dtype button');
+  if (seg) { S.dtype = seg.dataset.v; syncInputs(); return calc(); }
+  const chip = e.target.closest('[data-id]');
+  if (chip) { const id = chip.dataset.id; S.on = S.on.includes(id) ? S.on.filter(x => x !== id) : [...S.on, id]; return calc(); }
+  const sc = e.target.closest('[data-sh]');
+  if (sc) { const id = sc.dataset.sh; S.shOn = S.shOn.includes(id) ? S.shOn.filter(x => x !== id) : [...S.shOn, id]; return calc(); }
+});
+document.addEventListener('input', e => {
+  const el = e.target;
+  if (el.dataset.hp) S.hp[el.dataset.hp] = +el.value;
+  else if (el.id === 'trait') S.trait = el.checked;
+  else if (el.id in S) S[el.id] = +el.value;
+  calc();
+});
+$('trait').addEventListener('change', e => { S.trait = e.target.checked; calc(); });
+$('reset').addEventListener('click', () => { S = structuredClone(EXAMPLE); syncInputs(); calc(); });
+</script>
