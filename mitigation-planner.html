@@ -114,10 +114,10 @@
       </div>
     </div>
     <div class="tbl-wrap"><table class="mtable">
-      <thead><tr><th>#</th><th>ジョブ</th><th>名前</th><th>ログのプレイヤー</th><th class="num">最大HP</th><th class="num">クリ</th><th class="num">意思</th><th class="num">不屈</th><th class="num">信仰</th><th class="num">SS</th><th class="num">物理防御</th><th class="num">魔法防御</th></tr></thead>
+      <thead><tr><th>#</th><th>ジョブ</th><th>名前</th><th>ログのプレイヤー</th><th class="num">最大HP</th><th class="num">クリ</th><th class="num">意思</th><th class="num">不屈</th><th class="num">信仰</th><th class="num">SS</th><th class="num">物理防御</th><th class="num">魔法防御</th><th class="num">精神</th><th class="num">武器(魔)</th><th class="num">回復係数</th></tr></thead>
       <tbody id="mbody"></tbody>
     </table></div>
-    <p class="note">空欄の項目はジョブごとの標準値（<code>data/job-data.js</code> で管理）を使います。最大HPはログにHPがあればログの値が標準になります。被ダメージの計算に使うのは最大HP・不屈・物理防御・魔法防御で、クリ・意思・信仰・SSは記録用です。物理防御・魔法防御は「防御力の軽減を入れる」をオンにしたときだけ、入力のあるメンバーに掛かります。</p>
+    <p class="note">空欄の項目はジョブごとの標準値（<code>data/job-data.js</code> で管理）を使います。最大HPはログにHPがあればログの値が標準になります。被ダメージの計算に使うのは最大HP・不屈・物理防御・魔法防御です。回復量は、精神と武器(魔)（武器の魔法性能）が入っていれば回復計算式（意思・クリ・SS・不屈も使う）で、入っていなければ回復係数で簡易に計算します。信仰は記録用です。物理防御・魔法防御は「防御力の軽減を入れる」をオンにしたときだけ、入力のあるメンバーに掛かります。</p>
   </section>
 
   <section class="card" id="sumCard">

@@ -13,12 +13,16 @@ const JOB_FROM_LOG = {Paladin:'PLD',Warrior:'WAR',DarkKnight:'DRK',Gunbreaker:'G
   BlackMage:'BLM',Summoner:'SMN',RedMage:'RDM',Pictomancer:'PCT'};
 const DEFAULT_COMP = ['PLD','WAR','WHM','SCH','MNK','DRG','BRD','BLM'];
 const SLOT_IDS = ['m1','m2','m3','m4','m5','m6','m7','m8'];
-const STAT_KEYS = ['hp','crit','det','ten','pie','ss','def','mdef','hpp'];
-const STAT_LABEL = {hp:'最大HP', crit:'クリ', det:'意思', ten:'不屈', pie:'信仰', ss:'SS', def:'物理防御', mdef:'魔法防御', hpp:'回復係数'};
+const STAT_KEYS = ['hp','crit','det','ten','pie','ss','def','mdef','mnd','wd','hpp'];
+const STAT_LABEL = {hp:'最大HP', crit:'クリ', det:'意思', ten:'不屈', pie:'信仰', ss:'SS', def:'物理防御', mdef:'魔法防御', mnd:'精神', wd:'武器(魔)', hpp:'回復係数'};
 const roleGroup = r => r === 'tank' ? 'tank' : r === 'healer' ? 'healer' : 'dps';
 const ROLE_ORDER = {tank:0, healer:1, melee:2, ranged:3, caster:4};
 const FALLBACK_HP = {tank:290000, healer:170000, dps:175000};
-const TEN_SUB = 420, TEN_DIV = 2780; // Lv100 の不屈の基準値と除数（防御力の計算にも同じ除数を使う）
+// レベルごとの定数（data/job-data.js の MP_LEVEL。読めなかったときは Lv100 の値）
+const LV = Object.assign({main:440, sub:420, div:2780, hmp:268,
+  attr:{tank:100, healer:115, melee:100, ranged:100, caster:100}, trait:{tank:100, healer:130, melee:100, ranged:100, caster:100}},
+  (typeof window.MP_LEVEL === 'object' && window.MP_LEVEL) || {});
+const TEN_SUB = LV.sub, TEN_DIV = LV.div; // サブステータスの基準値と除数（不屈・防御力・クリティカルの計算に使う）
 
 // ===== スキル（data/mitigations.js の軽減と data/heals.js のヒール・バリアを、ID で引けるようにしたもの）=====
 // tab: 'mit' は「軽減」タブ、'heal' は「ヒール・バリア」タブに並ぶ。回復の効果も持つ軽減は MIT_HEAL_EXTRAS で足す

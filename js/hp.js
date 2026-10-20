@@ -2,18 +2,29 @@
 // HP の推移（攻撃によるダメージ・回復・HoT・バリア・平常時の回復）を、戦闘の頭から時刻順に計算する
 
 const TICK = 3;               // HoT と平常時の回復は3秒ごと
-const DET_SUB = 440;          // Lv100 の意思力の基準値
 const RECIT_WINDOW = 15;      // 秘策の効果時間（秒）
 
-// ===== ステータスから回復量の倍率を出す（Lv100）=====
-const detMul = m => (1000 + Math.floor(140 * (Math.max(statOf(m, 'det'), DET_SUB) - DET_SUB) / TEN_DIV)) / 1000;
-const critRate = m => Math.floor(200 * (Math.max(statOf(m, 'crit'), TEN_SUB) - TEN_SUB) / TEN_DIV + 50) / 1000;
-const critMul = m => (1400 + Math.floor(200 * (Math.max(statOf(m, 'crit'), TEN_SUB) - TEN_SUB) / TEN_DIV)) / 1000;
+// ===== 回復計算式の各関数（定数は data/job-data.js の MP_LEVEL）=====
+// 参考: https://sarachantubuyaki.jp/column/detailed-explanation-of-the-heel-calculation-formula
+const subOver = (m, k) => Math.max(statOf(m, k), LV.sub) - LV.sub;
+const fHMP  = m => Math.floor(100 * (statOf(m, 'mnd') - LV.main) / LV.hmp) + 100;              // f(回復魔法力)
+const fDET  = m => Math.floor(140 * (Math.max(statOf(m, 'det'), LV.main) - LV.main) / LV.div + 1000); // f(意思力)
+const fTNC  = m => Math.floor(110 * subOver(m, 'ten') / LV.div + 1000);                             // f(不屈)
+const fSPD  = m => Math.floor(130 * subOver(m, 'ss') / LV.div + 1000);                              // f(スペルスピード)
+const fWD   = m => Math.floor(LV.main * ((LV.attr || {})[roleOf(m)] || 100) / 1000 + statOf(m, 'wd')); // f(武器)
+const fCRIT = m => Math.floor(200 * subOver(m, 'crit') / LV.div + 1400);                            // クリティカル倍率（‰）
+const fCRITr = m => Math.floor(200 * subOver(m, 'crit') / LV.div + 50) / 10;                        // クリティカル発生率（%）
+const traitOf = m => (LV.trait || {})[roleOf(m)] || 100;
+// 精神と武器の魔法性能が入っていれば、記事どおりの式で計算できる
+const fullFormula = m => statOf(m, 'mnd') > LV.main && statOf(m, 'wd') > 0 && LV.hmp > 0;
+
+// 簡易計算（精神・武器が未入力のとき）で使う倍率
+const detMul = m => fDET(m) / 1000;
+const critRate = m => fCRITr(m) / 100;
+const critMul = m => fCRIT(m) / 1000;
 const hppOf = m => statOf(m, 'hpp') || 45;
-// 不屈はタンクの回復量にも効く（f(TNC) = 110 × (不屈 − 420) / 2780 + 1000）
-const tncHealMul = m => roleOf(m) === 'tank' ? (1000 + Math.floor(110 * (Math.max(statOf(m, 'ten'), TEN_SUB) - TEN_SUB) / TEN_DIV)) / 1000 : 1;
-// HoT はスペルスピード（スキルスピード）で強くなる（f(SPD) = 130 × (SS − 420) / 2780 + 1000）
-const spdMul = m => (1000 + Math.floor(130 * (Math.max(statOf(m, 'ss'), TEN_SUB) - TEN_SUB) / TEN_DIV)) / 1000;
+const tncHealMul = m => roleOf(m) === 'tank' ? fTNC(m) / 1000 : 1;
+const spdMul = m => fSPD(m) / 1000;
 
 // その時刻に効いているバフ（使った人の回復アップ・対象の被回復アップ・ニュートラルセクト）
 function buffActive(e, d, t){ return t >= e.t && t < e.t + (d.buffDur || d.d || 0); }
@@ -50,15 +61,24 @@ function targetsOf(e, d){
   const id = d.kind === 'self' ? e.caster : e.target;
   return act.filter(m => m.id === id);
 }
-// 威力から回復量を出す（回復計算式の順で、各段で小数点以下を切り捨てる）。
-//   H1 = 威力 × 回復係数 × f(意思力)          … 回復係数は f(回復魔法力) × f(武器) × 特性 をまとめた目安
-//   H2 = H1 × f(不屈)（タンクのみ）。HoT は f(不屈) の代わりに f(スペルスピード)
-//   H3 = H2 × クリティカル（確定 / 期待値 / なし）
-//   H  = H3 × バフ（使った人の回復魔法アップ・対象の被回復アップ）。±3% の乱数は入れず平均値で計算する
+// 威力から回復量を出す。各段で小数点以下を切り捨てる。±3% の乱数は入れず平均値で計算する
+//   H1 = ⌊⌊⌊威力 × f(HMP) × f(DET)⌋ ÷ 100⌋ ÷ 1000⌋
+//   H2 = ⌊⌊⌊⌊H1 × f(TNC)⌋ ÷ 1000⌋ × f(WD)⌋ ÷ 100⌋ × 特性⌋ ÷ 100⌋   … HoT は f(TNC) の代わりに f(SPD)
+//   H3 = ⌊H2 × クリティカル⌋（確定：f(CRIT)÷1000、期待値：1 + 発生率 ×（倍率 − 1）、なし：1）
+//   H  = H3 × 使った人の回復魔法アップ × 対象の被回復アップ
+// 精神・武器が未入力のメンバーは、H1〜H2 を「威力 × 回復係数 × f(DET)（タンクは × f(TNC)、HoT は × f(SPD)）」で代わりに出す
 function healAmount(pot, caster, target, t, crit, isHot){
-  let v = Math.floor(pot * hppOf(caster) * detMul(caster));
-  v = Math.floor(v * (isHot ? spdMul(caster) : tncHealMul(caster)));
-  if (crit === 'sure') v = Math.floor(v * critMul(caster));
+  let v;
+  if (fullFormula(caster)) {
+    const h1 = Math.floor(Math.floor(Math.floor(pot * fHMP(caster) * fDET(caster)) / 100) / 1000);
+    const x = isHot ? fSPD(caster) : fTNC(caster);
+    v = Math.floor(Math.floor(Math.floor(Math.floor(h1 * x) / 1000) * fWD(caster)) / 100);
+    v = Math.floor(Math.floor(v * traitOf(caster)) / 100);
+  } else {
+    v = Math.floor(pot * hppOf(caster) * detMul(caster));
+    v = Math.floor(v * (isHot ? spdMul(caster) : tncHealMul(caster)));
+  }
+  if (crit === 'sure') v = Math.floor(v * fCRIT(caster) / 1000);
   else if (crit === 'expect') v = Math.floor(v * (1 + critRate(caster) * (critMul(caster) - 1)));
   v = Math.floor(v * (1 + casterHealUp(caster.id, t)));
   return Math.floor(v * (1 + recvUp(target.id, t)));
