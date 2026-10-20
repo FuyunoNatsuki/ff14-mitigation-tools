@@ -115,7 +115,6 @@
     <div class="row" style="align-items:center">
       <button class="btn ghost small" id="importBtn" type="button">データを読み込む</button>
       <button class="btn ghost small" id="exportBtn" type="button">データを書き出す</button>
-      <button class="btn ghost small" id="demo" type="button">サンプルで試す</button>
       <input type="file" id="importFile" accept=".json,application/json" hidden>
       <span class="sub">書き出したファイルには戦闘データ・メンバー・軽減プランが入ります。</span>
     </div>
@@ -148,12 +147,25 @@
   <section class="card fold" id="planCard" data-fold="timeline">
     <div class="tl-tools fold-head">
       <h2 style="margin:0">タイムライン</h2>
+    </div>
+    <div class="fold-body">
+    <div class="tl-tabs-row">
       <div class="tabs" role="tablist" aria-label="配置するスキルの種類">
         <button type="button" role="tab" class="tab" id="tabMit" data-tab="mit">軽減</button>
         <button type="button" role="tab" class="tab" id="tabHeal" data-tab="heal">ヒール・バリア</button>
       </div>
+      <div class="phase-bar" id="phaseBar" role="group" aria-label="フェーズ"></div>
     </div>
-    <div class="fold-body">
+    <details class="phase-edit" id="phaseEdit">
+      <summary>フェーズを編集</summary>
+      <div id="phaseList"></div>
+      <div class="row" style="margin-top:8px;align-items:flex-end">
+        <label class="f" for="phName" style="width:160px">名前<input type="text" id="phName" maxlength="20" placeholder="例: P2"></label>
+        <label class="f" for="phStart" style="width:120px">開始（分:秒）<input type="text" id="phStart" placeholder="2:30.0" autocomplete="off"></label>
+        <button class="btn small" id="phAdd" type="button">フェーズを追加</button>
+      </div>
+      <p class="note">フェーズは「開始時刻」で区切ります（最初のフェーズは 0:00 から）。フェーズを選ぶとタイムラインと表がそのフェーズだけになりますが、前のフェーズで使ったスキルの効果時間・リキャストはそのまま引き継いで表示・計算します。開始時刻の欄が空なら、選んでいる攻撃の時刻を使います。</p>
+    </details>
     <div class="row heal-opts" id="healOpts" style="gap:10px 16px;align-items:center;margin-bottom:12px">
       <label class="toggle" for="hpSim"><input type="checkbox" id="hpSim"> HPの推移で判定する</label>
       <label class="toggle" for="critExp" title="オフのときは、秘策などで確定のもの以外はクリティカルなしで計算します"><input type="checkbox" id="critExp"> 回復のクリティカルを期待値で入れる</label>
@@ -231,6 +243,7 @@
 <script src="js/peers.js"></script>
 <script src="js/events.js"></script>
 <script src="js/manual-tl.js"></script>
+<script src="js/phases.js"></script>
 <script src="js/main.js"></script>
 </body>
 </html>

@@ -1,5 +1,5 @@
 'use strict';
-// 戦闘データの組み立て（ログ→攻撃一覧）、保存用の形式、サンプル戦闘
+// 戦闘データの組み立て（ログ→攻撃一覧）、保存用の形式
 
 // FF Logs のイベント配列から攻撃一覧を作る
 function buildFight({code, fightId, name, startTime, duration, events, actors, abilities}){
@@ -65,52 +65,23 @@ function makeFight({key, name, duration, players, hits, excluded, sample}){
 function finishFight(f){
   f.playerMap = new Map(f.players.map(p => [p.id, p]));
   f.casts.forEach((c, i) => c.id = i);
+  f.phases = cleanPhases(f.phases, f.duration);
   return f;
 }
 
 // 共有・保存用のコンパクトな形式
 function packFight(f){
-  return {key:f.key, name:f.name, duration:f.duration, excluded:f.excluded, sample:!!f.sample, manual:!!f.manual,
+  return {key:f.key, name:f.name, duration:f.duration, excluded:f.excluded, sample:!!f.sample, manual:!!f.manual, phases:(f.phases || []).map(p => ({id:p.id, name:p.name, start:p.start})),
     players:f.players.map(p => ({id:p.id, name:p.name, job:p.job, role:p.role, maxHP:p.maxHP || 0})),
     abilityTypes:{...f.abilityTypes},
     casts:f.casts.map(c => [c.t, c.abilityId, c.name, c.nHits, c.nExcl, c.targets.map(x => [x.pid, x.raw, x.est ? 1 : 0, x.n, x.actual]), c.manual ? 1 : 0])};
 }
 function unpackFight(p){
   if (!p || !Array.isArray(p.players) || !Array.isArray(p.casts)) throw new Error('bad fight');
-  return finishFight({key:String(p.key || 'imported'), name:String(p.name || '戦闘'), duration:+p.duration || 0, excluded:+p.excluded || 0, sample:!!p.sample, manual:!!p.manual,
+  return finishFight({key:String(p.key || 'imported'), name:String(p.name || '戦闘'), duration:+p.duration || 0, excluded:+p.excluded || 0, sample:!!p.sample, manual:!!p.manual, phases:p.phases,
     players:p.players.map(x => ({id:+x.id, name:String(x.name || '?'), job:String(x.job || ''), role:['tank','healer','dps'].includes(x.role) ? x.role : 'dps', maxHP:+x.maxHP || 0})),
     abilityTypes:Object.assign({}, p.abilityTypes || {}),
     casts:p.casts.map(c => ({t:+c[0], abilityId:c[1], name:String(c[2]), nHits:+c[3], nExcl:+c[4],
       targets:c[5].map(x => ({pid:+x[0], raw:x[1] == null ? null : +x[1], est:!!x[2], n:+x[3], actual:+x[4]})), manual:!!c[6]}))});
 }
 
-// ===== サンプルデータ =====
-function demoFight(){
-  const jobs = [['Paladin','ナイト'],['DarkKnight','暗黒騎士'],['WhiteMage','白魔道士'],['Sage','賢者'],['Samurai','侍'],['Reaper','リーパー'],['Bard','吟遊詩人'],['Pictomancer','ピクトマンサー']];
-  const players = jobs.map(([job, ja], i) => ({id:i + 1, name:'サンプル ' + ja, job, role:roleGroup((JOB_DATA[JOB_FROM_LOG[job]] || {}).role),
-    maxHP:(i < 2 ? 292000 : 172000) + i * 731}));
-  const hits = []; let seed = 7;
-  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
-  const add = (t, id, name, type, base, targets, shieldRate = 0.25) => targets.forEach(pid => {
-    const unmit = Math.round(base * (0.95 + rnd() * 0.1));
-    const shielded = rnd() < shieldRate;
-    hits.push({t:t + rnd() * 300, abilityId:id, abilityName:name, abilityType:type, targetId:pid,
-      unmit:shielded ? null : unmit, actual:Math.round(unmit * 0.8), valid:!shielded});
-  });
-  const all = players.map(p => p.id);
-  const seq = [
-    [9,'raid','グランドクロス',1024,168000],[24,'tb','ヘヴンリーストライク',128,410000],[48,'raid','アルティメット・フレア',1024,202000],
-    [71,'raid','クリスタル・インパクト',128,155000],[95,'tb','ヘヴンリーストライク',128,410000],[118,'raid','グランドクロス',1024,176000],
-    [140,'raid','ダークネス・ノヴァ',32,148000],[166,'tb','ヘヴンリーストライク',128,425000],[190,'raid','アルティメット・フレア',1024,225000],
-    [214,'raid','クリスタル・インパクト',128,162000],[240,'raid','グランドクロス',1024,184000],[262,'tb','ヘヴンリーストライク',128,430000],
-    [285,'raid','アルティメット・フレア',1024,248000],
-  ];
-  const ids = {'グランドクロス':101,'ヘヴンリーストライク':102,'アルティメット・フレア':103,'クリスタル・インパクト':104,'ダークネス・ノヴァ':105};
-  for (const [t, kind, name, type, base] of seq) {
-    if (kind === 'raid') add(t * 1000, ids[name], name, type, base, all);
-    else { add(t * 1000, ids[name], name, type, base, [1], 0); add(t * 1000 + 3000, ids[name] + 50, name + '（追撃）', type, base * 0.55, [1, 2], 0.1); }
-  }
-  for (let t = 4; t < 300; t += 3) add(t * 1000, 7, '攻撃', 128, 18000, [1], 0.3);
-  return makeFight({key:'sample', name:'サンプル戦闘（架空の零式）', duration:305000, players, hits,
-    excluded:hits.filter(h => !h.valid).length, sample:true});
-}

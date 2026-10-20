@@ -52,7 +52,11 @@ function evalCast(c){
 }
 
 function visibleCasts(evals){
+  // 表示中のフェーズの範囲にある攻撃だけ（全体のときは TL 全体）
+  const [vs, ve] = viewRange(), whole = !currentPhase();
   return evals.filter(ev => {
+    const t = ev.c.t / 1000;
+    if (t < vs || (whole ? t > ve : t >= ve)) return false;
     // サンプルがない攻撃は、実ダメージ（バリア込み）で下限を判定する
     const size = ev.status === 'none' ? ev.maxActual : ev.maxRaw;
     if (size < (settings.minDmg || 0)) return false;

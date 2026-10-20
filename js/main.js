@@ -1,5 +1,5 @@
 'use strict';
-// 起動処理（ルームへの参加・FF Logs ログインからの復帰・サンプル表示）
+// 起動処理（ルームへの参加・FF Logs ログインからの復帰・前回の戦闘の表示）
 
 // 初期化
 (function init(){
@@ -16,8 +16,8 @@
       if (mode !== 'shared') {
         // 共有できない表示（未ログインなど）：このブラウザだけで動かす
         $('sharedBox').hidden = true;
-        setModeBadge(); setFight(demoFight(), null, null);
-        setStatus('共有データに接続できないため、このブラウザだけで表示しています。サインインすると共有プランが見られます。');
+        setModeBadge(); fight = null; renderAll();
+        setStatus('共有データに接続できないため、このブラウザだけで使います。書き出したデータを読み込むか、新しいTLを作ってください。');
       }
     });
     return;
@@ -45,15 +45,15 @@ function startPage(q){
     const db = readDbInput();
     if (db) { startRoom(db, qRoom, null); return; }
   }
-  // 前回開いていた戦闘があればそれを、なければサンプルを表示する
+  // 前回開いていた戦闘があればそれを表示する（なければ、読み込み・共有だけを出して待つ）
   const last = store.get('fflp-lastfight');
-  if (last) {
+  if (last && !last.sample) {
     try {
       setFight(unpackFight(last), null, null);
       setStatus(`前回の戦闘「${fight.name}」を表示しています。`);
       return;
     } catch (e) { store.del('fflp-lastfight'); }
   }
-  setFight(demoFight(), null, null);
-  setStatus('サンプルデータを表示中です。FF Logs のURLを貼って「読み込む」か、「新しいTLを手入力で作る」から始めてください。');
+  fight = null; renderAll();
+  setStatus('FF Logs のURLを貼って「読み込む」か、「新しいTLを手入力で作る」から始めてください。');
 }

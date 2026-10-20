@@ -128,7 +128,7 @@ const SharedOps = {
       const saveFight = fight; fight = f;
       const mem = extra && extra.members ? mergeMembers(extra.members) : (prevMeta && prevMeta.members ? mergeMembers(prevMeta.members) : defaultMembers(f));
       fight = saveFight;
-      const meta = {name:packed.name, duration:packed.duration, excluded:packed.excluded, sample:packed.sample, key:packed.key,
+      const meta = {name:packed.name, duration:packed.duration, excluded:packed.excluded, sample:packed.sample, manual:packed.manual, phases:packed.phases, key:packed.key,
         players:packed.players, abilityTypes:packed.abilityTypes, typeOverrides:(prevMeta && prevMeta.typeOverrides) || {},
         members:membersObj(mem), partySize:(extra && extra.partySize) || (prevMeta && prevMeta.partySize) || defaultPartySize(f),
         overrides:cleanOverrides((extra && extra.overrides) || (prevMeta && prevMeta.overrides)),

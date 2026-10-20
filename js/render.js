@@ -17,6 +17,8 @@ function renderAll(){
   if (drag) { renderPending = true; return; }
   renderPending = false;
   document.body.classList.toggle('ro', readOnly);
+  // TL（ログから作ったもの・手入力のもの）がないあいだは、読み込み・共有以外のセクションを隠す
+  document.body.classList.toggle('no-fight', !fight);
   renderMembers();
   if (!fight) return renderEmpty();
   plan.forEach(fixEntry);
@@ -24,15 +26,15 @@ function renderAll(){
   SIM = simulateHp(EVALS);
   if (settings.hpSim) applyHpSim(EVALS, SIM);
   const vis = visibleCasts(EVALS);
-  renderSummary(vis); renderJobFilter(); renderPalette(); renderTimeline(vis); renderTable(vis); renderEdit(); renderInsertAt(); renderControls(); renderAddCast();
+  renderSummary(vis); renderPhaseBar(); renderPhaseList(); renderJobFilter(); renderPalette(); renderTimeline(vis); renderTable(vis); renderEdit(); renderInsertAt(); renderControls(); renderAddCast();
   if (mode === 'local') saveLocal();
 }
 function renderEmpty(){
   $('summary').innerHTML = mode === 'shared'
-    ? '<span class="sub">共有中の戦闘はまだありません。書き出したデータを「データを読み込む」で取り込むか、「サンプルで試す」で始めてください。</span>'
+    ? '<span class="sub">共有中の戦闘はまだありません。書き出したデータを「データを読み込む」で取り込むか、新しいTLを作ってください。</span>'
     : mode === 'room'
-    ? '<span class="sub">このルームにはまだ戦闘データがありません。FF Logs のログを読み込むか、「データを読み込む」「サンプルで試す」で始めると、ルームの全員に共有されます。</span>'
-    : '<span class="sub">ログを読み込むか「サンプルで試す」を押すと、ここに戦闘の概要が出ます。</span>';
+    ? '<span class="sub">このルームにはまだ戦闘データがありません。FF Logs のログを読み込むか、「データを読み込む」「新しいTLを手入力で作る」で始めると、ルームの全員に共有されます。</span>'
+    : '<span class="sub">ログを読み込むか、新しいTLを作ると、ここに戦闘の概要が出ます。</span>';
   $('tl').innerHTML = ''; $('palette').innerHTML = ''; $('editBox').hidden = true; $('insertAt').textContent = '';
   $('tbody').innerHTML = '<tr><td colspan="9" class="empty">まだ戦闘データがありません。</td></tr>';
   renderControls();
@@ -61,7 +63,7 @@ function renderMembers(){
   body.innerHTML = members.map((m, i) => {
     const j = jobOf(m) || {};
     const ph = k => k === 'hp' ? defaultHp(m) : (j[k] || '');
-    const num = k => `<td class="num c-stat" data-label="${STAT_LABEL[k]}"><input type="number" min="0" step="${k === 'hp' ? 1000 : 1}" data-mstat="${k}" data-mid="${m.id}" value="${m[k] > 0 ? m[k] : ''}" placeholder="${esc(ph(k))}" aria-label="${esc(memberName(m))} ${k}" ${readOnly ? 'disabled' : ''}${k === 'hp' ? ' style="width:100px"' : ''}></td>`;
+    const num = k => `<td class="num c-stat" data-label="${STAT_LABEL[k]}"><input type="number" min="0" step="${k === 'hp' ? 1000 : 1}" data-mstat="${k}" data-mid="${m.id}" value="${m[k] > 0 ? m[k] : ''}" placeholder="${esc(ph(k))}" aria-label="${esc(memberName(m))} ${k}" ${readOnly ? 'disabled' : ''}></td>`;
     return `<tr class="${i < partySize ? '' : 'inactive'}">
       <td class="slot c-slot">${i + 1}</td>
       <td class="c-job"><div class="row" style="gap:6px;align-items:center;flex-wrap:nowrap">${jobBadge(m)}<select data-mjob="${m.id}" aria-label="${i + 1}人目のジョブ" ${readOnly ? 'disabled' : ''}>${JOB_ORDER.map(k => `<option value="${k}"${k === m.job ? ' selected' : ''}>${esc(JOB_DATA[k].ja)}</option>`).join('')}</select></div></td>
@@ -97,7 +99,9 @@ function clashSet(){
 
 function renderTimeline(vis){
   const pps = settings.zoom;
-  const durS = fight.duration / 1000;
+  // 表示中のフェーズの範囲（全体のときは 0 〜 戦闘の長さ）。横位置は範囲の始まりを 0 にする
+  const [vs, ve] = viewRange();
+  const durS = ve - vs;
   const W = Math.ceil((durS + 10) * pps);
   const clash = clashSet();
   const visSet = new Set(vis.map(v => v.c.id));
@@ -105,24 +109,31 @@ function renderTimeline(vis){
   const slotIndex = id => SLOT_IDS.indexOf(id);
   let ticks = '';
   const step = pps >= 12 ? 10 : pps >= 6 ? 15 : 30;
-  for (let s = 0; s <= durS + 10; s += step) ticks += `<div class="tick-s" style="left:${s * pps}px">${fmtT(s).replace(/\.0$/, '')}</div>`;
+  for (let s = Math.ceil(vs / step) * step; s <= ve + 10; s += step) ticks += `<div class="tick-s" style="left:${(s - vs) * pps}px">${fmtT(s).replace(/\.0$/, '')}</div>`;
   let html = `<div class="lab head">時刻</div><div class="lane head" style="width:${W}px">${ticks}</div>`;
   html += `<div class="lab casts">攻撃</div><div class="lane casts" style="width:${W}px">` +
     EVALS.filter(ev => visSet.has(ev.c.id)).map(ev => {
       const dots = (others.get(ev.c.id) || []).slice(0, 1).map(col => `<span class="pdot" style="background:${esc(col)}"></span>`).join('');
-      return `<button type="button" class="cast ${ev.status}${selCast === ev.c.id ? ' sel' : ''}" data-cast="${ev.c.id}" style="left:${ev.c.t / 1000 * pps}px"
+      return `<button type="button" class="cast ${ev.status}${selCast === ev.c.id ? ' sel' : ''}" data-cast="${ev.c.id}" style="left:${(ev.c.t / 1000 - vs) * pps}px"
       title="${fmtT(ev.c.t / 1000)} ${esc(ev.c.name)}（${TYPE_LABEL[ev.type]}）\n元ダメ最大 ${fmt(ev.maxRaw)} → 予測 ${fmt(ev.maxDmg)}" aria-label="${fmtT(ev.c.t / 1000)} ${esc(ev.c.name)}">${dots}</button>`; }).join('') + '</div>';
 
+  // フェーズの前から続いている効果・リキャストは、左端で切って表示する（引き継ぎ）
+  const inView = (e, d) => e.t <= ve && e.t + Math.max(d.d || 0, d.r || 0) >= vs;
   const barHtml = (e, d, k) => {
     const who = e.by && profileCache[e.by] && profileCache[e.by].name ? `\n配置: ${profileCache[e.by].name}` : '';
-    const rec = d.r ? `<div class="rbar ${k}" style="left:${e.t * pps}px;width:${d.r * pps}px"></div>` : '';
-    return rec + `<button type="button" class="mbar ${k}${selEntry === e.uid ? ' sel' : ''}${clash.has(e.uid) ? ' clash' : ''}" data-entry="${esc(e.uid)}" style="left:${e.t * pps}px;width:${Math.max(d.d * pps, 22)}px" title="${esc(d.name)} ${fmtT(e.t)}〜${fmtT(e.t + d.d)}${d.r ? ' / リキャスト' + d.r + '秒' : ''}${clash.has(e.uid) ? '（リキャスト中）' : ''}${esc(who)}">${iconHtml(d, k)}<span class="bname">${esc(d.name)}</span></button>`;
+    const x0 = e.t - vs, left = Math.max(x0, 0), clipped = x0 < 0;
+    const recW = d.r ? x0 + d.r - left : 0;
+    const rec = recW > 0 ? `<div class="rbar ${k}" style="left:${left * pps}px;width:${recW * pps}px"></div>` : '';
+    const effW = x0 + d.d - left;
+    if (effW <= 0) return rec;
+    const tip = `${esc(d.name)} ${fmtT(e.t)}〜${fmtT(e.t + d.d)}${d.r ? ' / リキャスト' + d.r + '秒' : ''}${clash.has(e.uid) ? '（リキャスト中）' : ''}${clipped ? '（前のフェーズから継続）' : ''}${esc(who)}`;
+    return rec + `<button type="button" class="mbar ${k}${selEntry === e.uid ? ' sel' : ''}${clash.has(e.uid) ? ' clash' : ''}${clipped ? ' clipped' : ''}" data-entry="${esc(e.uid)}" style="left:${left * pps}px;width:${Math.max(effW * pps, clipped ? 4 : 22)}px" title="${tip}">${iconHtml(d, k)}<span class="bname">${esc(d.name)}</span></button>`;
   };
   // メンバーごとに、ジョブの軽減の並び順で行を固定する（時刻で並び替えない）
   const fs = jobFilterSet();
   for (const m of activeMembers().filter(m => passesJobFilter(m, fs))) {
-    html += `<div class="lab member">${jobBadge(m)}<span class="lname">${esc(memberName(m))}</span>${hpLowLabel(m)}</div><div class="lane member" style="width:${W}px">${hpSvg(m, W, pps)}</div>`;
-    const mine = plan.filter(e => !e.custom && e.caster === m.id && MIT[e.mitId].tab === settings.tab);
+    html += `<div class="lab member">${jobBadge(m)}<span class="lname">${esc(memberName(m))}</span>${hpLowLabel(m, vs, ve)}</div><div class="lane member" style="width:${W}px">${hpSvg(m, W, pps, vs, ve)}</div>`;
+    const mine = plan.filter(e => !e.custom && e.caster === m.id && MIT[e.mitId].tab === settings.tab && inView(e, MIT[e.mitId]));
     const rows = new Map();
     for (const e of mine) { const rk = e.mitId + '|' + (MIT[e.mitId].kind === 'single' ? e.target : ''); (rows.get(rk) || rows.set(rk, []).get(rk)).push(e); }
     const ordered = [...rows.entries()].sort((a, b) => {
@@ -136,7 +147,7 @@ function renderTimeline(vis){
         list.map(e => barHtml(e, d, d.kind)).join('') + '</div>';
     }
   }
-  const customs = settings.tab === 'mit' ? plan.filter(e => e.custom) : [];
+  const customs = settings.tab === 'mit' ? plan.filter(e => e.custom && inView(e, e.custom)) : [];
   if (customs.length) {
     html += `<div class="lab member"><span class="jb none">他</span>自由入力</div><div class="lane member" style="width:${W}px"></div>`;
     const rows = new Map();
@@ -148,7 +159,7 @@ function renderTimeline(vis){
     }
   }
   const sc = selCast != null ? fight.casts[selCast] : null;
-  if (sc) html += `<div class="guide" style="left:calc(var(--lab-w) + ${sc.t / 1000 * pps}px)"></div>`;
+  if (sc && sc.t / 1000 >= vs && sc.t / 1000 <= ve) html += `<div class="guide" style="left:calc(var(--lab-w) + ${(sc.t / 1000 - vs) * pps}px)"></div>`;
   $('tl').innerHTML = html;
 }
 
@@ -230,7 +241,6 @@ function renderEdit(){
 function renderControls(){
   $('clearPlan').disabled = readOnly || !plan.length;
   $('importBtn').disabled = readOnly && mode === 'shared';
-  $('demo').disabled = readOnly && mode === 'shared';
   $('sharedFight').disabled = readOnly;
   // タブの選択状態と、ヒール・バリアの設定欄
   for (const b of document.querySelectorAll('.tab')) b.setAttribute('aria-selected', String(b.dataset.tab === settings.tab));
@@ -256,12 +266,20 @@ function actionTip(d){
 
 // ===== HP の推移（メンバーの行に描く）=====
 const LANE_H = 28;
-function hpSvg(m, W, pps){
-  const pts = SIM && SIM.series.get(m.id);
-  if (!pts || !pts.length) return '';
+// 表示範囲（フェーズ）の HP の推移：範囲の始まりの時点の値から始め、範囲の中の点だけを使う
+function seriesInView(m, vs = 0, ve = Infinity){
+  const all = SIM && SIM.series.get(m.id);
+  if (!all || !all.length) return null;
+  let first = all[0];
+  for (const p of all) { if (p[0] <= vs) first = p; else break; }
+  return [[vs, first[1], first[2], first[3]], ...all.filter(p => p[0] > vs && p[0] <= ve)];
+}
+function hpSvg(m, W, pps, vs = 0, ve = Infinity){
+  const pts = seriesInView(m, vs, ve);
+  if (!pts) return '';
   const max = hpOf(m);
   const y = v => (LANE_H - 2 - Math.max(0, Math.min(1, v / max)) * (LANE_H - 4)).toFixed(1);
-  const x = t => (t * pps).toFixed(1);
+  const x = t => ((t - vs) * pps).toFixed(1);
   // 階段状の線：時刻ごとに直前の値から新しい値へ縦に移る
   let hpTop = `M0,${y(pts[0][1])}`, shTop = `M0,${y(pts[0][1] + pts[0][2])}`;
   let deadAt = null;
@@ -275,7 +293,7 @@ function hpSvg(m, W, pps){
   // バリアは HP の線の上に重ねた帯（HP の線を逆向きにたどって閉じる）
   const hpArea = `${hpTop} V${LANE_H} H0 Z`;
   const shArea = `${shTop} V${y(pts[pts.length - 1][1])} ${reverseStep(pts, x, y)} Z`;
-  const dead = deadAt != null ? `<rect class="dead" x="${x(deadAt)}" y="${LANE_H - 4}" width="${Math.max(0, W - deadAt * pps)}" height="4"></rect>` : '';
+  const dead = deadAt != null ? `<rect class="dead" x="${x(deadAt)}" y="${LANE_H - 4}" width="${Math.max(0, W - (deadAt - vs) * pps)}" height="4"></rect>` : '';
   return `<svg class="hpsvg" viewBox="0 0 ${W} ${LANE_H}" preserveAspectRatio="none" aria-hidden="true"><path class="sh" d="${shArea}"></path><path class="hp" d="${hpArea}"></path>${dead}</svg>`;
 }
 // HP の階段線を右から左へたどる（バリアの帯の下側）
@@ -285,8 +303,8 @@ function reverseStep(pts, x, y){
   return d + ' H0';
 }
 // メンバー名の横に、戦闘中の最低HP（%）
-function hpLowLabel(m){
-  const pts = SIM && SIM.series.get(m.id);
+function hpLowLabel(m, vs = 0, ve = Infinity){
+  const pts = seriesInView(m, vs, ve);
   if (!pts || pts.length < 2) return '';
   const max = hpOf(m);
   const dead = pts.some(p => p[3]);
