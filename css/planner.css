@@ -175,6 +175,17 @@ footer{font-size:.74rem;color:var(--muted);max-width:90ch}
 @media (prefers-reduced-motion:no-preference){.cast,.mbar{transition:background-color .2s}}
 .tl .lab .lname{overflow:hidden;text-overflow:ellipsis;min-width:0}
 
+/* ===== メンバー表：見出しと入力欄を左そろえ・上そろえにして、列の位置をそろえる ===== */
+.mtable{width:auto}
+.mtable th,.mtable td,.mtable th.num,.mtable td.num{text-align:left;vertical-align:top}
+.mtable th{white-space:nowrap;padding-bottom:6px}
+.mtable td{padding-top:6px;padding-bottom:6px}
+.mtable td.slot{padding-top:11px}
+.mtable input[type=number]{width:96px;text-align:left}
+.mtable .c-job select{width:auto;min-width:9.5em}
+.mtable .c-pid select{width:auto;min-width:10em}
+.mtable .nm{width:140px}
+
 /* ===== 縦長のスマホ（幅640px以下）===== */
 @media (max-width:640px){
   .wrap{padding-block:14px 32px;gap:12px}
@@ -266,3 +277,20 @@ details.add-cast summary{cursor:pointer;font-weight:700;font-size:.84rem;color:v
 .mtable .c-food select{min-width:180px}
 .food-gain{margin-top:2px;white-space:normal;max-width:220px}
 @media (max-width:640px){ .mtable td.c-food{grid-column:1 / -1} .mtable .c-food select{min-width:0} .food-gain{max-width:none} }
+
+/* ===== TL がないあいだは、読み込み・共有だけを出す ===== */
+body.no-fight section.fold:not([data-fold="load"]){display:none}
+
+/* ===== タイムラインのタブとフェーズ ===== */
+.tl-tabs-row{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;margin-bottom:12px}
+.phase-bar{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.phase-bar:empty{display:none}
+.ph{border:1px solid var(--line);background:var(--bg);color:var(--fg);border-radius:999px;padding:3px 12px;font-size:.78rem;font-weight:700}
+.ph .sub{margin-left:4px;font-family:var(--f-display)}
+.ph.on{border-color:var(--accent);background:var(--accent-soft)}
+details.phase-edit{margin-bottom:12px;border:1px dashed var(--line);border-radius:8px;padding:8px 12px}
+details.phase-edit summary{cursor:pointer;font-weight:700;font-size:.84rem;color:var(--accent)}
+.ph-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px}
+.ph-row input[type=text]{width:auto}
+.ph-row .ph-name{width:140px}.ph-row .ph-start{width:100px}
+.tl .lane .clipped{border-top-left-radius:0;border-bottom-left-radius:0}

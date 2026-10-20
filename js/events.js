@@ -4,7 +4,7 @@
 // ===== 操作 =====
 function addEntry(mitId, casterId){
   if (readOnly) return;
-  if (!fight) { setStatus('先にデータを読み込むか「サンプルで試す」を押してください。', 'err'); return; }
+  if (!fight) { setStatus('先にログを読み込むか、新しいTLを作ってください。', 'err'); return; }
   const t = insertTime();
   let target = 'all', custom, caster = null;
   if (mitId === '__custom') { custom = {name:'自作軽減', p:10, m:10, d:15}; mitId = 'custom'; }
@@ -105,8 +105,8 @@ $('tl').addEventListener('pointermove', ev => {
   if (Math.abs(dx) > 3) drag.moved = true;
   if (!drag.moved) return;
   drag.e.t = Math.max(0, Math.round((drag.t0 + dx / settings.zoom) * 2) / 2);
-  drag.bar.style.left = drag.e.t * settings.zoom + 'px';
-  if (drag.rec) drag.rec.style.left = drag.e.t * settings.zoom + 'px';
+  drag.bar.style.left = (drag.e.t - viewStart()) * settings.zoom + 'px';
+  if (drag.rec) drag.rec.style.left = (drag.e.t - viewStart()) * settings.zoom + 'px';
 });
 function endDrag(){
   if (!drag) return;
@@ -157,18 +157,6 @@ $('clearPlan').addEventListener('click', ev => {
   if (!plan.length || readOnly) return;
   if (!clearArmed) { clearArmed = true; ev.target.textContent = 'もう一度押すと消去'; setTimeout(() => { clearArmed = false; ev.target.textContent = '全消去'; }, 3000); return; }
   clearArmed = false; ev.target.textContent = '全消去'; selEntry = null; ops().clear();
-});
-let demoArmed = false;
-$('demo').addEventListener('click', ev => {
-  if (mode === 'shared' || mode === 'room') {
-    if (readOnly) return;
-    // 共有中は全員の画面が切り替わるので、2回押しで確認する
-    const hasOther = mode === 'room' ? (fight && !fight.sample) : (Shared.key && Shared.key !== 'sample');
-    if (!demoArmed && hasOther) { demoArmed = true; ev.target.textContent = '全員の画面が切り替わります。もう一度押す'; setTimeout(() => { demoArmed = false; ev.target.textContent = 'サンプルで試す'; }, 4000); return; }
-    demoArmed = false; ev.target.textContent = 'サンプルで試す';
-    return ops().loadFight(demoFight(), [], null);
-  }
-  setFight(demoFight(), null, null); setStatus('サンプルデータを読み込みました。数値は架空のものです。', 'ok');
 });
 $('sharedFight').addEventListener('change', e => {
   const k = e.target.value; if (!k || readOnly || k === Shared.key) return;
