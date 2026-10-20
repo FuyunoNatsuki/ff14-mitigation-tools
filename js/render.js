@@ -244,6 +244,7 @@ function actionTip(d){
   if (d.recv) parts.push(`被回復+${Math.round(d.recv * 100)}%`);
   if (d.recit) parts.push('次の鼓舞・意気・不撓・深謀がクリティカル確定');
   if (d.ns) parts.push(`ニュートラルセクト中は回復量の${Math.round(d.ns * 100)}%のバリア`);
+  if (d.trigger) parts.push(`HPが${Math.round((d.trigger.under || 0.5) * 100)}%を下回ったら回復 威力${d.trigger.pot}（${d.trigger.dur}秒以内に下回らなければ終了時に回復）`);
   if (d.delay) parts.push(`${d.delay}秒後に発動`);
   parts.push(`${d.d}秒 / リキャスト${d.r}秒`);
   return parts.join(' / ');

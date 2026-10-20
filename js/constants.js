@@ -30,6 +30,6 @@ const MIT = Object.fromEntries([
 ].map((m, i) => [m.id, {...m, order:i}]));
 const ACTIONS = Object.values(MIT);
 // 回復・バリア・回復アップの効果があるか（HP の推移の計算に使う）
-const hasHealEffect = d => !!(d && (d.heal || d.hot || d.shield || d.healUp || d.recv || d.recit || d.ns));
+const hasHealEffect = d => !!(d && (d.heal || d.hot || d.shield || d.healUp || d.recv || d.recit || d.ns || d.trigger));
 const TYPE_LABEL = {phys:'物理', mag:'魔法', unique:'特殊'};
 const CLUSTER_GAP = 1000; // ms

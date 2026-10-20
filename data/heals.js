@@ -12,6 +12,8 @@
 //   recit  : 秘策（次の対象スキルがクリティカル確定）。recitable : 秘策の対象
 //   catalyze : クリティカルのとき、回復量の180%のバリアを追加（鼓舞激励の策）
 //   ns     : ニュートラルセクト中に、回復量に対してこの割合のバリアを追加
+//   trigger: {pot: 威力, under: 0.5, dur: 秒}。効果時間中に HP が最大HPの under を下回った瞬間に回復し、
+//            下回らなければ効果時間の終わりに回復する（深謀遠慮の策・シャドウヴィジル・ハート・オブ・コランダム）
 const HEALS = [
   // ----- 白魔道士 -----
   {id:'medica3',  abbr:'メ3', name:'メディカラ',               jobs:['WHM'], kind:'party',  d:15, r:2.5, heal:250, hot:{pot:175, dur:15}},
@@ -28,7 +30,7 @@ const HEALS = [
   {id:'adlo',     abbr:'鼓舞', name:'鼓舞激励の策',             jobs:['SCH'], kind:'single', d:30, r:2.5, heal:300, shield:{pct:1.8}, shieldDur:30, recitable:true, catalyze:true},
   {id:'concit',   abbr:'意気', name:'意気軒高の策',             jobs:['SCH'], kind:'party',  d:30, r:2.5, heal:200, shield:{pct:1.8}, shieldDur:30, recitable:true},
   {id:'indom',    abbr:'不撓', name:'不撓不屈の策',             jobs:['SCH'], kind:'party',  d:3,  r:30,  heal:400, recitable:true},
-  {id:'excog',    abbr:'深謀', name:'深謀遠慮の策',             jobs:['SCH'], kind:'single', d:3,  r:45,  heal:800, recitable:true},
+  {id:'excog',    abbr:'深謀', name:'深謀遠慮の策',             jobs:['SCH'], kind:'single', d:45, r:45,  trigger:{pot:800, under:0.5, dur:45}, recitable:true},
   {id:'lustrate', abbr:'活性', name:'生命活性法',               jobs:['SCH'], kind:'single', d:3,  r:1,   heal:600},
   {id:'whisper',  abbr:'囁き', name:'光の囁き',                 jobs:['SCH'], kind:'party',  d:21, r:60,  hot:{pot:80, dur:21}},
   {id:'blessing', abbr:'祝福', name:'フェイブレッシング',       jobs:['SCH'], kind:'party',  d:3,  r:60,  heal:320},
@@ -73,4 +75,6 @@ const MIT_HEAL_EXTRAS = {
   kera:       {hot:{pot:100, dur:15}},
   holos:      {heal:300, shield:{pot:300}, shieldDur:30},
   tauro:      {heal:700},
+  vigil:      {trigger:{pot:1200, under:0.5, dur:20}},
+  corundum:   {trigger:{pot:900, under:0.5, dur:20}},
 };
