@@ -34,7 +34,7 @@ document.addEventListener('click', ev => {
   const cast = t.closest('[data-cast]');
   if (cast) { selCast = +cast.dataset.cast; announceSelection(); renderAll(); const row = document.querySelector(`[data-row="${selCast}"]`); if (row) row.scrollIntoView({block:'nearest'}); return; }
   const row = t.closest('[data-row]');
-  if (row && !t.closest('select, input')) { const id = +row.dataset.row; if (selCast === id) { openRows.has(id) ? openRows.delete(id) : openRows.add(id); } selCast = id; announceSelection(); renderAll(); return; }
+  if (row && !t.closest('select, input, button')) { const id = +row.dataset.row; if (selCast === id) { openRows.has(id) ? openRows.delete(id) : openRows.add(id); } selCast = id; announceSelection(); renderAll(); return; }
   if (t.id === 'edDel') { const id = selEntry; selEntry = null; return ops().remove(id); }
   if (t.id === 'edClose') { selEntry = null; return renderAll(); }
 });
@@ -60,6 +60,14 @@ document.addEventListener('change', ev => {
   }
   if (t.id === 'partySize') { const n = clampNum(t.value, 1, 8, 8); t.blur(); return ops().setPartySize(Math.round(n)); }
   const e = plan.find(x => x.uid === selEntry);
+  if (e && t.dataset.eovr) {
+    // 回復量・HoT・バリア量の手入力（空にすると計算値に戻る）
+    const v = Math.round(+t.value);
+    const ovr = {...(e.ovr || {})};
+    if (v > 0 && v < 1e7) ovr[t.dataset.eovr] = v; else delete ovr[t.dataset.eovr];
+    if (Object.keys(ovr).length) e.ovr = ovr; else delete e.ovr;
+    t.blur(); return ops().update(e);
+  }
   if (e) {
     if (t.id === 'edT') { const v = parseT(t.value); if (v != null) { e.t = Math.max(0, v); t.blur(); ops().update(e); } return; }
     if (t.id === 'edTarget') { e.target = t.value === 'all' ? 'all' : t.value; t.blur(); return ops().update(e); }
@@ -75,7 +83,6 @@ $('ten').addEventListener('change', e => { settings.ten = e.target.checked; save
 $('defOn').addEventListener('change', e => { settings.def = e.target.checked; saveSettings(); renderAll(); });
 $('hpSim').addEventListener('change', e => { settings.hpSim = e.target.checked; saveSettings(); renderAll(); });
 $('critExp').addEventListener('change', e => { settings.critExp = e.target.checked; saveSettings(); renderAll(); });
-$('regenPct').addEventListener('change', e => { settings.regenPct = clampNum(e.target.value, 0, 20, 0); saveSettings(); renderAll(); });
 // タブ（軽減 / ヒール・バリア）の切り替え
 for (const b of document.querySelectorAll('.tab')) b.addEventListener('click', () => { settings.tab = b.dataset.tab; selEntry = null; saveSettings(); renderAll(); });
 $('zoom').addEventListener('change', e => { settings.zoom = +e.target.value; saveSettings(); renderAll(); });
@@ -174,3 +181,30 @@ $('fight').addEventListener('change', async () => { $('load').disabled = true; t
 const saveCred = () => { if ($('remember').checked) store.set('fflp-cred', {id:$('cid').value.trim(), sec:$('csec').value.trim()}); else store.del('fflp-cred'); };
 ['cid', 'csec'].forEach(id => $(id).addEventListener('change', saveCred));
 $('remember').addEventListener('change', saveCred);
+
+// ジョブで絞り込み：押したジョブを選ぶ／外す。「すべて」で解除
+document.addEventListener('click', ev => {
+  const b = ev.target.closest('[data-jobf]'); if (!b) return;
+  const j = b.dataset.jobf;
+  const cur = new Set(jobFilterSet());
+  if (!j) cur.clear(); else if (cur.has(j)) cur.delete(j); else cur.add(j);
+  settings.jobFilter = [...cur];
+  saveSettings(); renderAll();
+});
+
+// 各セクションの折り畳み（見出しの右のボタン。開閉はこのブラウザに覚えておく）
+function initFolds(){
+  const saved = store.get('fflp-fold') || {};
+  for (const sec of document.querySelectorAll('section.fold')) {
+    const key = sec.dataset.fold, head = sec.querySelector('.fold-head'), body = sec.querySelector('.fold-body');
+    if (!head || !body) continue;
+    body.id = body.id || 'fold-' + key;
+    const btn = document.createElement('button');
+    btn.type = 'button'; btn.className = 'fold-btn'; btn.setAttribute('aria-controls', body.id);
+    const set = open => { sec.classList.toggle('collapsed', !open); btn.setAttribute('aria-expanded', String(open)); btn.textContent = open ? '畳む' : '開く'; btn.title = open ? 'このセクションを畳む' : 'このセクションを開く'; };
+    set(saved[key] !== false);
+    btn.addEventListener('click', () => { const open = sec.classList.contains('collapsed'); set(open); const s = store.get('fflp-fold') || {}; s[key] = open; store.set('fflp-fold', s); });
+    head.appendChild(btn);
+  }
+}
+initFolds();

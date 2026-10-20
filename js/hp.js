@@ -3,6 +3,7 @@
 
 const TICK = 3;               // HoT と平常時の回復は3秒ごと
 const RECIT_WINDOW = 15;      // 秘策の効果時間（秒）
+const REGEN_PCT = 1;          // 平常時の回復：3秒ごとに最大HPの1%（固定）
 
 // ===== 回復計算式の各関数（定数は data/job-data.js の MP_LEVEL）=====
 // 参考: https://sarachantubuyaki.jp/column/detailed-explanation-of-the-heel-calculation-formula
@@ -134,7 +135,9 @@ function simulateHp(evals){
       for (const m of targetsOf(e, d)) {
         const s = st.get(m.id); if (!s || s.dead) continue;
         let healed = 0;
-        if (d.heal) { healed = healAmount(d.heal, caster, m, t, mode); s.hp = Math.min(s.max, s.hp + healed); }
+        // 手入力の回復量（1人あたり）があればそれを使う
+        const ov = e.ovr || {};
+        if (d.heal) { healed = ov.heal > 0 ? ov.heal : healAmount(d.heal, caster, m, t, mode); s.hp = Math.min(s.max, s.hp + healed); }
         let shield = 0;
         if (d.shield) {
           if (d.shield.pct) shield += Math.floor((healed || healAmount(d.heal || 0, caster, m, t, mode)) * d.shield.pct);
@@ -145,10 +148,12 @@ function simulateHp(evals){
         if (d.catalyze && mode === 'sure' && healed) shield += Math.floor(healed * 1.8);
         // ニュートラルセクト中：回復量に対してバリアを追加
         if (d.ns && healed && nsActive(caster.id, t)) shield += Math.floor(healed * d.ns);
+        // 手入力のバリア量があれば、計算したバリア（NS・クリティカルの追加分も含む）の代わりに使う
+        if (d.shield && ov.shield > 0) shield = ov.shield;
         if (shield > 0) s.shields.push({amt:shield, exp:t + (d.shieldDur || 30)});
         // HP 条件の回復（深謀遠慮の策など）：回復量は付けた時点の強さで決め、発動を待つ
         if (d.trigger) {
-          const tr = {key:e.uid + '/' + m.id, amt:healAmount(d.trigger.pot, caster, m, t, mode), under:d.trigger.under || 0.5, exp:t + d.trigger.dur};
+          const tr = {key:e.uid + '/' + m.id, amt:ov.heal > 0 ? ov.heal : healAmount(d.trigger.pot, caster, m, t, mode), under:d.trigger.under || 0.5, exp:t + d.trigger.dur};
           s.triggers.push(tr);
           // 付けた時点ですでに閾値を下回っていれば、すぐに回復する
           fireTriggers(s, t, x => x === tr && s.hp < s.max * x.under);
@@ -164,7 +169,8 @@ function simulateHp(evals){
     // HoT は効果を付けた時点の強さで、3秒ごとに回復する
     if (d.hot) {
       const ticks = Math.floor(d.hot.dur / TICK);
-      const amounts = new Map(targetsOf(e, d).map(m => [m.id, healAmount(d.hot.pot, caster, m, t0, mode === 'sure' ? null : mode, true)]));
+      const hotOv = e.ovr && e.ovr.hot > 0 ? e.ovr.hot : 0;
+      const amounts = new Map(targetsOf(e, d).map(m => [m.id, hotOv || healAmount(d.hot.pot, caster, m, t0, mode === 'sure' ? null : mode, true)]));
       for (let k = 1; k <= ticks; k++) {
         events.push({t:t0 + k * TICK, pri:0, fn:t => {
           for (const [id, amt] of amounts) { const s = st.get(id); if (!s || s.dead) continue; s.hp = Math.min(s.max, s.hp + amt); record(id, t); }
@@ -173,8 +179,8 @@ function simulateHp(evals){
     }
   }
 
-  // 平常時の回復（最大HPに対する割合を3秒ごと）
-  const regen = Math.max(0, +settings.regenPct || 0) / 100;
+  // 平常時の回復（3秒ごとに最大HPの REGEN_PCT %）
+  const regen = REGEN_PCT / 100;
   if (regen > 0) for (let t = TICK; t <= fight.duration / 1000; t += TICK) {
     events.push({t, pri:0, fn:t => { for (const s of st.values()) { if (s.dead) continue; s.hp = Math.min(s.max, s.hp + Math.floor(s.max * regen)); record(s.m.id, t); } }});
   }

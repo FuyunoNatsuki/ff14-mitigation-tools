@@ -9,7 +9,7 @@ let members = [];       // 8枠 {id, job, name, pid, hp, crit, det, ten, pie, ss
 let partySize = 8;
 let overrides = {};     // 攻撃キー -> 元ダメージ（1人あたり）
 let selCast = null, selEntry = null, openRows = new Set();
-let settings = {trait:false, ten:true, def:false, zoom:8, minDmg:30000, scope:'all', tab:'mit', hpSim:true, critExp:false, regenPct:0};
+let settings = {trait:false, ten:true, def:false, zoom:8, minDmg:30000, scope:'all', tab:'mit', hpSim:true, critExp:false, jobFilter:[]};
 let readOnly = false;
 
 const $ = id => document.getElementById(id);

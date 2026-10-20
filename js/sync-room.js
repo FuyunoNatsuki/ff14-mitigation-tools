@@ -31,7 +31,7 @@ function roomWriteError(e){
     ? 'ルームに書き込めませんでした。共有ルームの設定（中継サーバーとデータベースのルール）を管理者に確認してもらってください。'
     : '保存に失敗しました。ネットワークを確認して、もう一度操作してください。', 'err');
 }
-const roomBody = e => { const o = {mitId:e.mitId, t:e.t, target:e.target, caster:e.caster || null, by:Room.clientId}; if (e.custom) o.custom = {...e.custom}; return o; };
+const roomBody = e => { const o = {mitId:e.mitId, t:e.t, target:e.target, caster:e.caster || null, by:Room.clientId}; if (e.custom) o.custom = {...e.custom}; if (e.ovr) o.ovr = {...e.ovr}; return o; };
 const roomFightBody = f => ({json:JSON.stringify(packFight(f)), ver:uid(), name:f.name, at:{'.sv':'timestamp'}});
 const roomMember = m => { const o = {job:m.job, name:m.name, pid:m.pid}; for (const k of STAT_KEYS) o[k] = m[k] || 0; return o; };
 const RoomOps = {
@@ -43,6 +43,12 @@ const RoomOps = {
   setMember(m){ renderAll(); roomReq('PUT', 'members/' + m.id, roomMember(m)).catch(roomWriteError); },
   setPartySize(n){ partySize = n; renderAll(); roomReq('PUT', 'partySize', n).catch(roomWriteError); },
   setOverride(k, v){ if (v) overrides[k] = v; else delete overrides[k]; renderAll(); (v ? roomReq('PUT', 'overrides/' + k, v) : roomReq('DELETE', 'overrides/' + k)).catch(roomWriteError); },
+  // 攻撃の追加・削除：戦闘データだけ書き直す（プラン・メンバーはそのまま）
+  updateFight(f){
+    const body = roomFightBody(f);
+    Room.fightVer = body.ver; Room.baseTypes = {...f.abilityTypes}; fight = f; renderAll();
+    roomReq('PUT', 'fight', body).catch(roomWriteError);
+  },
   // 戦闘を入れ替えるときは、ルームのプラン・メンバー・上書きも一緒に入れ替える（1回の書き込みで）
   async loadFight(f, planList, extra){
     const planObj = {};

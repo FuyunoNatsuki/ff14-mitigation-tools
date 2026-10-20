@@ -24,7 +24,7 @@ function renderAll(){
   SIM = simulateHp(EVALS);
   if (settings.hpSim) applyHpSim(EVALS, SIM);
   const vis = visibleCasts(EVALS);
-  renderSummary(vis); renderPalette(); renderTimeline(vis); renderTable(vis); renderEdit(); renderInsertAt(); renderControls();
+  renderSummary(vis); renderJobFilter(); renderPalette(); renderTimeline(vis); renderTable(vis); renderEdit(); renderInsertAt(); renderControls(); renderAddCast();
   if (mode === 'local') saveLocal();
 }
 function renderEmpty(){
@@ -72,7 +72,8 @@ function renderMembers(){
 }
 
 function renderPalette(){
-  const rows = activeMembers().map(m => {
+  const fs = jobFilterSet();
+  const rows = activeMembers().filter(m => passesJobFilter(m, fs)).map(m => {
     const acts = ACTIONS.filter(d => d.tab === settings.tab && d.jobs.includes(m.job));
     return `<div class="prow"><span class="who">${jobBadge(m)}<span style="overflow:hidden;text-overflow:ellipsis">${esc(memberName(m))}</span></span>
       ${acts.map(d => `<button type="button" class="pbtn" data-add="${d.id}" data-caster="${m.id}" title="${esc(actionTip(d))}" ${readOnly ? 'disabled' : ''}>${iconHtml(d, d.kind)}</button>`).join('') || '<span class="sub">配置できるスキルなし</span>'}</div>`;
@@ -117,7 +118,8 @@ function renderTimeline(vis){
     return rec + `<button type="button" class="mbar ${k}${selEntry === e.uid ? ' sel' : ''}${clash.has(e.uid) ? ' clash' : ''}" data-entry="${esc(e.uid)}" style="left:${e.t * pps}px;width:${Math.max(d.d * pps, 22)}px" title="${esc(d.name)} ${fmtT(e.t)}〜${fmtT(e.t + d.d)}${d.r ? ' / リキャスト' + d.r + '秒' : ''}${clash.has(e.uid) ? '（リキャスト中）' : ''}${esc(who)}">${iconHtml(d, k)}<span class="bname">${esc(d.name)}</span></button>`;
   };
   // メンバーごとに、ジョブの軽減の並び順で行を固定する（時刻で並び替えない）
-  for (const m of activeMembers()) {
+  const fs = jobFilterSet();
+  for (const m of activeMembers().filter(m => passesJobFilter(m, fs))) {
     html += `<div class="lab member">${jobBadge(m)}<span class="lname">${esc(memberName(m))}</span>${hpLowLabel(m)}</div><div class="lane member" style="width:${W}px">${hpSvg(m, W, pps)}</div>`;
     const mine = plan.filter(e => !e.custom && e.caster === m.id && MIT[e.mitId].tab === settings.tab);
     const rows = new Map();
@@ -166,7 +168,7 @@ function renderTable(vis){
     const est = ev.rows.some(r => r.estimated) ? ' <span class="est">推定</span>' : '';
     let out = `<tr class="cast-row${selCast === c.id ? ' sel' : ''}" data-row="${c.id}">
       <td class="time c-time">${fmtT(c.t / 1000)}</td>
-      <td class="c-name"><span class="aname">${esc(c.name)}</span>${est}<div class="sub">${c.nHits}ヒット${c.nExcl ? ` / バリア除外 ${c.nExcl}` : ''}</div></td>
+      <td class="c-name"><span class="aname">${esc(c.name)}</span>${est}${c.manual ? ` <span class="manual">手入力</span> <button type="button" class="btn danger small" data-delcast="${c.id}" ${readOnly ? 'disabled' : ''}>削除</button>` : ''}<div class="sub">${c.nHits}ヒット${c.nExcl ? ` / バリア除外 ${c.nExcl}` : ''}</div></td>
       <td class="c-type"><select class="type-sel ${ev.type}" data-type="${esc(c.abilityId)}" aria-label="ダメージ種別" ${readOnly ? 'disabled' : ''}>${Object.entries(TYPE_LABEL).map(([k, v]) => `<option value="${k}"${k === ev.type ? ' selected' : ''}>${v}</option>`).join('')}</select></td>
       <td class="num c-n">${ev.targets}</td>
       <td class="num c-raw" data-label="元ダメ"><input type="number" class="ovr${ev.ovr ? ' set' : ''}" min="0" step="1000" data-ovr="${esc(ev.key)}" value="${ev.ovr || ''}" placeholder="${ev.logMax ? Math.round(ev.logMax) : '—'}" aria-label="${esc(c.name)} の元ダメージ" ${readOnly ? 'disabled' : ''}>${ev.ovr ? '<div class="manual">手入力</div>' : ''}</td>
@@ -214,6 +216,7 @@ function renderEdit(){
   box.innerHTML = `<span class="name">${iconHtml(d, k)}${esc(d.name)} <span class="sub">${caster ? esc(memberName(caster)) + ' / ' : ''}${esc(d.custom ? `物理${d.p}% / 魔法${d.m}% / ${d.d}秒` : actionTip(d).split(' / ').slice(1).join(' / '))}</span></span>
     <label class="f" for="edT">開始時刻<input type="text" id="edT" value="${fmtT(e.t)}" style="width:90px"></label>
     <label class="f" for="edTarget">対象<select id="edTarget" ${k === 'party' || k === 'self' ? 'disabled' : ''}>${targetOpts}</select></label>
+    ${healOvrFields(e, d)}
     ${k === 'custom' ? `<label class="f" for="edP">物理%<input type="number" id="edP" value="${d.p}" min="0" max="100" style="width:80px"></label>
       <label class="f" for="edM">魔法%<input type="number" id="edM" value="${d.m}" min="0" max="100" style="width:80px"></label>
       <label class="f" for="edD">効果秒<input type="number" id="edD" value="${d.d}" min="1" style="width:80px"></label>
@@ -288,4 +291,50 @@ function hpLowLabel(m){
   const dead = pts.some(p => p[3]);
   const low = Math.min(...pts.map(p => p[1])) / max * 100;
   return `<span class="hpnow" style="${dead ? 'color:var(--bad)' : low < 15 ? 'color:var(--warn)' : ''}">${dead ? '戦闘不能' : '最低' + low.toFixed(0) + '%'}</span>`;
+}
+
+// ===== 回復量・HoT・バリア量の手入力欄（編集欄）=====
+// 空欄のときは計算した値を薄く表示する（1人目の対象・クリティカルなしで計算）
+function healOvrFields(e, d){
+  if (e.custom || !d || !hasHealEffect(d)) return '';
+  const caster = memberById(e.caster), tgt = targetsOf(e, d)[0];
+  if (!caster || !tgt) return '';
+  const ov = e.ovr || {};
+  const field = (key, label, calc) => `<label class="f" for="ed_${key}">${label}<input type="number" id="ed_${key}" data-eovr="${key}" min="0" step="100" value="${ov[key] || ''}" placeholder="${calc}" style="width:120px"></label>`;
+  const pot = d.heal || (d.trigger && d.trigger.pot);
+  let html = '';
+  if (pot) html += field('heal', '回復量（手入力）', healAmount(pot, caster, tgt, e.t, null));
+  if (d.hot) html += field('hot', 'HoT 1回分（手入力）', healAmount(d.hot.pot, caster, tgt, e.t, null, true));
+  if (d.shield) {
+    let sh = 0;
+    if (d.shield.pct) sh += Math.floor(healAmount(d.heal || 0, caster, tgt, e.t, null) * d.shield.pct);
+    if (d.shield.pot) sh += healAmount(d.shield.pot, caster, tgt, e.t, null);
+    if (d.shield.hpPct) sh += Math.floor((d.shield.of === 'caster' ? hpOf(caster) : hpOf(tgt)) * d.shield.hpPct);
+    html += field('shield', 'バリア量（手入力）', sh);
+  }
+  return html;
+}
+
+// ===== ジョブで絞り込み（軽減・バリアを置いているジョブ。複数選ぶといずれか＝OR）=====
+// 置いているジョブ：参加中のメンバーで、軽減・ヒール・バリアを1つ以上置いている人のジョブ
+function placedJobs(){
+  const act = activeMembers();
+  const has = new Set(plan.filter(e => !e.custom && entryLive(e)).map(e => e.caster));
+  return [...new Set(act.filter(m => has.has(m.id)).map(m => m.job))].sort((a, b) => JOB_ORDER.indexOf(a) - JOB_ORDER.indexOf(b));
+}
+// 実際に効いている絞り込み（選んだジョブのうち、今も置いているもの。空なら全員）
+function jobFilterSet(){
+  const present = new Set(placedJobs());
+  return new Set((settings.jobFilter || []).filter(j => present.has(j)));
+}
+const passesJobFilter = (m, fs) => !fs.size || fs.has(m.job);
+function renderJobFilter(){
+  const box = $('jobFilter');
+  const jobs = placedJobs();
+  const fs = jobFilterSet();
+  if (!jobs.length) { box.innerHTML = ''; return; }
+  box.innerHTML = `<span class="sub">ジョブで絞り込み（複数選ぶといずれか）</span>
+    <button type="button" class="jf${fs.size ? '' : ' on'}" data-jobf="" aria-pressed="${!fs.size}">すべて</button>` +
+    jobs.map(j => { const d = JOB_DATA[j]; const on = fs.has(j);
+      return `<button type="button" class="jf${on ? ' on' : ''}" data-jobf="${j}" aria-pressed="${on}"><span class="jb ${d.role}">${esc(d.abbr)}</span>${esc(d.ja)}</button>`; }).join('');
 }

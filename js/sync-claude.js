@@ -96,7 +96,7 @@ function renderFightPicker(){
   if (Shared.key) sel.value = Shared.key;
 }
 
-const entryBody = e => { const o = {mitId:e.mitId, t:e.t, target:e.target, caster:e.caster || null, by:Shared.myId || null, at:Date.now()}; if (e.custom) o.custom = {...e.custom}; return o; };
+const entryBody = e => { const o = {mitId:e.mitId, t:e.t, target:e.target, caster:e.caster || null, by:Shared.myId || null, at:Date.now()}; if (e.custom) o.custom = {...e.custom}; if (e.ovr) o.ovr = {...e.ovr}; return o; };
 const sharedMeta = data => Shared.db.doc(`fights/${Shared.key}`).update(data).catch(writeError);
 const SharedOps = {
   add(e){ plan.push(e); renderAll(); Shared.db.doc(`fights/${Shared.key}/plan/${e.uid}`).set(entryBody(e)).catch(writeError); },
@@ -108,6 +108,8 @@ const SharedOps = {
   setMember(m){ renderAll(); sharedMeta({members:{[m.id]:{...m}}}); },
   setPartySize(n){ partySize = n; renderAll(); sharedMeta({partySize:n}); },
   setOverride(k, v){ if (v) overrides[k] = v; else delete overrides[k]; renderAll(); sharedMeta({overrides:{[k]:v || 0}}); },
+  // 攻撃の追加・削除：戦闘データを書き直す（プラン・メンバーは前のものを引き継ぐ）
+  updateFight(f){ fight = f; renderAll(); return SharedOps.loadFight(f, null, null); },
   // 戦闘データを共有に書き込み、全員の表示をその戦闘に切り替える
   async loadFight(f, planList, extra){
     const db = Shared.db, k = keySeg(f.key), base = 'fights/' + k;

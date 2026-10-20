@@ -70,18 +70,18 @@ function finishFight(f){
 
 // 共有・保存用のコンパクトな形式
 function packFight(f){
-  return {key:f.key, name:f.name, duration:f.duration, excluded:f.excluded, sample:!!f.sample,
+  return {key:f.key, name:f.name, duration:f.duration, excluded:f.excluded, sample:!!f.sample, manual:!!f.manual,
     players:f.players.map(p => ({id:p.id, name:p.name, job:p.job, role:p.role, maxHP:p.maxHP || 0})),
     abilityTypes:{...f.abilityTypes},
-    casts:f.casts.map(c => [c.t, c.abilityId, c.name, c.nHits, c.nExcl, c.targets.map(x => [x.pid, x.raw, x.est ? 1 : 0, x.n, x.actual])])};
+    casts:f.casts.map(c => [c.t, c.abilityId, c.name, c.nHits, c.nExcl, c.targets.map(x => [x.pid, x.raw, x.est ? 1 : 0, x.n, x.actual]), c.manual ? 1 : 0])};
 }
 function unpackFight(p){
   if (!p || !Array.isArray(p.players) || !Array.isArray(p.casts)) throw new Error('bad fight');
-  return finishFight({key:String(p.key || 'imported'), name:String(p.name || '戦闘'), duration:+p.duration || 0, excluded:+p.excluded || 0, sample:!!p.sample,
+  return finishFight({key:String(p.key || 'imported'), name:String(p.name || '戦闘'), duration:+p.duration || 0, excluded:+p.excluded || 0, sample:!!p.sample, manual:!!p.manual,
     players:p.players.map(x => ({id:+x.id, name:String(x.name || '?'), job:String(x.job || ''), role:['tank','healer','dps'].includes(x.role) ? x.role : 'dps', maxHP:+x.maxHP || 0})),
     abilityTypes:Object.assign({}, p.abilityTypes || {}),
     casts:p.casts.map(c => ({t:+c[0], abilityId:c[1], name:String(c[2]), nHits:+c[3], nExcl:+c[4],
-      targets:c[5].map(x => ({pid:+x[0], raw:x[1] == null ? null : +x[1], est:!!x[2], n:+x[3], actual:+x[4]}))}))});
+      targets:c[5].map(x => ({pid:+x[0], raw:x[1] == null ? null : +x[1], est:!!x[2], n:+x[3], actual:+x[4]})), manual:!!c[6]}))});
 }
 
 // ===== サンプルデータ =====

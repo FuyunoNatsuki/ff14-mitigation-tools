@@ -4,7 +4,7 @@
 // 初期化
 (function init(){
   const s = store.get('fflp-settings'); if (s) Object.assign(settings, s);
-  $('trait').checked = settings.trait; $('ten').checked = settings.ten !== false; $('defOn').checked = !!settings.def; $('hpSim').checked = settings.hpSim !== false; $('critExp').checked = !!settings.critExp; $('regenPct').value = settings.regenPct || ''; if (!['mit', 'heal'].includes(settings.tab)) settings.tab = 'mit'; $('zoom').value = String(settings.zoom); $('minDmg').value = settings.minDmg; $('scope').value = settings.scope;
+  $('trait').checked = settings.trait; $('ten').checked = settings.ten !== false; $('defOn').checked = !!settings.def; $('hpSim').checked = settings.hpSim !== false; $('critExp').checked = !!settings.critExp; if (!['mit', 'heal'].includes(settings.tab)) settings.tab = 'mit'; $('zoom').value = String(settings.zoom); $('minDmg').value = settings.minDmg; $('scope').value = settings.scope;
   const c = store.get('fflp-cred'); if (c) { $('cid').value = c.id || ''; $('csec').value = c.sec || ''; } else $('credBox').open = true;
   members = defaultMembers(null);
   if (window.claude && typeof window.claude.use === 'function') {
@@ -45,7 +45,15 @@ function startPage(q){
     const db = readDbInput();
     if (db) { startRoom(db, qRoom, null); return; }
   }
-  // 最初はサンプルを表示して、使い方がわかる状態にする
+  // 前回開いていた戦闘があればそれを、なければサンプルを表示する
+  const last = store.get('fflp-lastfight');
+  if (last) {
+    try {
+      setFight(unpackFight(last), null, null);
+      setStatus(`前回の戦闘「${fight.name}」を表示しています。`);
+      return;
+    } catch (e) { store.del('fflp-lastfight'); }
+  }
   setFight(demoFight(), null, null);
-  setStatus('サンプルデータを表示中です。FF Logs のURLを貼って「読み込む」を押すと実際のログに切り替わります。');
+  setStatus('サンプルデータを表示中です。FF Logs のURLを貼って「読み込む」か、「新しいTLを手入力で作る」から始めてください。');
 }

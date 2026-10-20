@@ -20,14 +20,16 @@
     <div class="formula">予測被ダメ = 元ダメージ × Π(1−軽減) × 不屈 × 防御力</div>
   </header>
 
-  <section class="card">
-    <div class="share-bar">
+  <section class="card fold" data-fold="load">
+    <div class="fold-head share-bar">
       <div class="row" style="align-items:center;gap:10px">
+        <h2 style="margin:0">読み込み・共有</h2>
         <span class="mode local" id="modeBadge">ローカル</span>
         <span class="sub" id="modeText">このブラウザだけで保存されます。</span>
       </div>
       <div class="peers" id="peers"></div>
     </div>
+    <div class="fold-body">
     <div class="divider"></div>
 
     <div id="fflogsBox">
@@ -95,6 +97,19 @@
       <div class="divider"></div>
     </div>
 
+    <div id="newTlBox">
+      <h2>新しいTLを手入力で作る</h2>
+      <div class="row">
+        <label class="f grow" for="newTlName">TLの名前
+          <input type="text" id="newTlName" maxlength="60" placeholder="例: 零式4層 前半"></label>
+        <label class="f" for="newTlLen" style="width:140px">戦闘の長さ（分:秒）
+          <input type="text" id="newTlLen" placeholder="10:00" autocomplete="off"></label>
+        <button class="btn ghost" id="newTl" type="button">作る</button>
+      </div>
+      <p class="note">攻撃のない空のTLを作ります。攻撃は下の「攻撃ごとの予測」の「攻撃を追加」から入れてください。メンバーは今のメンバー表のまま使います。</p>
+      <div class="divider"></div>
+    </div>
+
     <div class="row" style="align-items:center">
       <button class="btn ghost small" id="importBtn" type="button">データを読み込む</button>
       <button class="btn ghost small" id="exportBtn" type="button">データを書き出す</button>
@@ -102,42 +117,47 @@
       <input type="file" id="importFile" accept=".json,application/json" hidden>
       <span class="sub">書き出したファイルには戦闘データ・メンバー・軽減プランが入ります。</span>
     </div>
+    </div>
     <div class="status" id="status" role="status"></div>
   </section>
 
-  <section class="card" id="memberCard">
-    <div class="tl-tools">
+  <section class="card fold" id="memberCard" data-fold="members">
+    <div class="tl-tools fold-head">
       <h2 style="margin:0">メンバー</h2>
       <div class="row" style="gap:10px;align-items:center">
         <label class="f" for="partySize" style="flex-direction:row;align-items:center;gap:6px">参加人数
           <select id="partySize" style="width:auto"></select></label>
       </div>
     </div>
+    <div class="fold-body">
     <div class="tbl-wrap"><table class="mtable">
       <thead><tr><th>#</th><th>ジョブ</th><th>名前</th><th>ログのプレイヤー</th><th class="num">最大HP</th><th class="num">クリ</th><th class="num">意思</th><th class="num">不屈</th><th class="num">信仰</th><th class="num">SS</th><th class="num">物理防御</th><th class="num">魔法防御</th><th class="num">精神</th><th class="num">武器(魔)</th><th class="num">回復係数</th></tr></thead>
       <tbody id="mbody"></tbody>
     </table></div>
     <p class="note">空欄の項目はジョブごとの標準値（<code>data/job-data.js</code> で管理）を使います。最大HPはログにHPがあればログの値が標準になります。被ダメージの計算に使うのは最大HP・不屈・物理防御・魔法防御です。回復量は、精神と武器(魔)（武器の魔法性能）が入っていれば回復計算式（意思・クリ・SS・不屈も使う）で、入っていなければ回復係数で簡易に計算します。信仰は記録用です。物理防御・魔法防御は「防御力の軽減を入れる」をオンにしたときだけ、入力のあるメンバーに掛かります。</p>
+    </div>
   </section>
 
-  <section class="card" id="sumCard">
-    <div class="summary" id="summary"></div>
+  <section class="card fold" id="sumCard" data-fold="summary">
+    <div class="tl-tools fold-head"><h2 style="margin:0">概要</h2></div>
+    <div class="fold-body"><div class="summary" id="summary"></div></div>
   </section>
 
-  <section class="card" id="planCard">
-    <div class="tl-tools">
+  <section class="card fold" id="planCard" data-fold="timeline">
+    <div class="tl-tools fold-head">
       <h2 style="margin:0">タイムライン</h2>
       <div class="tabs" role="tablist" aria-label="配置するスキルの種類">
         <button type="button" role="tab" class="tab" id="tabMit" data-tab="mit">軽減</button>
         <button type="button" role="tab" class="tab" id="tabHeal" data-tab="heal">ヒール・バリア</button>
       </div>
     </div>
+    <div class="fold-body">
     <div class="row heal-opts" id="healOpts" style="gap:10px 16px;align-items:center;margin-bottom:12px">
       <label class="toggle" for="hpSim"><input type="checkbox" id="hpSim"> HPの推移で判定する</label>
       <label class="toggle" for="critExp" title="オフのときは、秘策などで確定のもの以外はクリティカルなしで計算します"><input type="checkbox" id="critExp"> 回復のクリティカルを期待値で入れる</label>
-      <label class="f" for="regenPct" style="flex-direction:row;align-items:center;gap:6px;white-space:nowrap">平常時の回復（3秒ごと、最大HPの）
-        <input type="number" id="regenPct" min="0" max="20" step="0.1" style="width:80px"> %</label>
+      <span class="sub">平常時の回復：3秒ごとに最大HPの1%（固定）</span>
     </div>
+    <div class="job-filter" id="jobFilter" role="group" aria-label="ジョブで絞り込み"></div>
     <div class="palette" id="palette"></div>
     <div class="tl-tools">
       <span class="insert-at" id="insertAt"></span>
@@ -157,11 +177,12 @@
       <span style="--c:var(--hp-line)">HP（メンバーの行）</span><span style="--c:var(--shield-line)">バリア</span>
     </div>
     <div class="edit" id="editBox" hidden></div>
-    <p class="note">攻撃の目盛りか下の表の行をクリックすると、その時刻が配置位置になります。上のアイコンを押すと、そのメンバーのスキルが配置されます。バーはドラッグで移動、クリックで編集できます。バーの下の薄い線はリキャスト、斜線のバーはリキャスト中の重複です。メンバーの行には、攻撃・回復・HoT・バリアを時刻順に計算したHPの推移（緑）とバリア（黄）が出ます。回復量は威力×回復係数×意思力で計算し、秘策の対象スキルはクリティカル確定、ニュートラルセクト中のアスペクト・ベネフィクとヘリオス・コンジャンクションにはバリアを足します。</p>
+    <p class="note">攻撃の目盛りか下の表の行をクリックすると、その時刻が配置位置になります。上のアイコンを押すと、そのメンバーのスキルが配置されます。バーはドラッグで移動、クリックで編集できます。バーの下の薄い線はリキャスト、斜線のバーはリキャスト中の重複です。メンバーの行には、攻撃・回復・HoT・バリアを時刻順に計算したHPの推移（緑）とバリア（黄）が出ます。回復量は威力×回復係数×意思力で計算し、秘策の対象スキルはクリティカル確定、ニュートラルセクト中のアスペクト・ベネフィクとヘリオス・コンジャンクションにはバリアを足します。バーをクリックすると、回復量・HoTの1回分・バリア量を手入力で上書きできます。</p>
+    </div>
   </section>
 
-  <section class="card">
-    <div class="tl-tools">
+  <section class="card fold" data-fold="casts">
+    <div class="tl-tools fold-head">
       <h2 style="margin:0">攻撃ごとの予測</h2>
       <div class="row" style="gap:10px;align-items:center">
         <label class="f" for="minDmg" style="flex-direction:row;align-items:center;gap:6px;white-space:nowrap">元ダメージ下限
@@ -170,11 +191,25 @@
           <select id="scope" style="width:auto"><option value="all">すべて</option><option value="aoe">4人以上に当たる攻撃</option><option value="tb">タンクへの攻撃</option></select></label>
       </div>
     </div>
+    <div class="fold-body">
+    <details class="add-cast" id="addCastBox">
+      <summary>攻撃を追加</summary>
+      <div class="row" style="margin-top:10px">
+        <label class="f" for="acTime" style="width:110px">時刻（分:秒）<input type="text" id="acTime" placeholder="1:23.0" autocomplete="off"></label>
+        <label class="f grow" for="acName" style="flex-basis:180px">攻撃の名前<input type="text" id="acName" maxlength="40" placeholder="例: 全体攻撃"></label>
+        <label class="f" for="acType" style="width:110px">種別<select id="acType"><option value="mag">魔法</option><option value="phys">物理</option><option value="unique">特殊</option></select></label>
+        <label class="f" for="acDmg" style="width:140px">元ダメ（1人あたり）<input type="number" id="acDmg" min="1" step="1000" placeholder="150000"></label>
+        <label class="f" for="acTarget" style="width:170px">当たる人<select id="acTarget"></select></label>
+        <button class="btn" id="acAdd" type="button">追加</button>
+      </div>
+      <p class="note">追加した攻撃は表の行にある「削除」で消せます。ログから読み込んだ攻撃は消せません。</p>
+    </details>
     <div class="tbl-wrap"><table class="pred">
       <thead><tr><th>時刻</th><th>攻撃</th><th>種別</th><th class="num">人数</th><th class="num">元ダメ（上書き可）</th><th>有効な軽減</th><th class="num">予測被ダメ(最大)</th><th class="num">最小残りHP</th><th>判定</th></tr></thead>
       <tbody id="tbody"></tbody>
     </table></div>
     <p class="note">元ダメージはログの「軽減前ダメージ」です。欄に数値を入れると、その攻撃の元ダメージ（1人あたり）として、ログの値より優先して使います（ルームでは全員に共有されます）。空にするとログの値に戻ります。バリアで吸収されたヒットはサンプルから除外し、同じ攻撃で当たった他のメンバーの値（中央値）で補います（<span class="est">推定</span>表示）。</p>
+    </div>
   </section>
 
   <footer>軽減率と効果時間はパッチ7.x（黄金のレガシー）時点の値です。被ダメージの±5%程度のブレと、回復・HP減少中の状態は計算に入れていません。不屈と防御力の軽減はLv100の計算式（不屈は420を基準、防御力は 15×防御力÷2780 %）です。FF Logs の元ダメージに防御力の分がすでに含まれていると思われる場合は「防御力の軽減を入れる」をオフのままにしてください。FF Logs の元ダメージにタンク特性の20%が含まれていないと感じたら「タンク特性を追加で掛ける」をオンにしてください。行を開くと実際のダメージと比べられます。</footer>
@@ -193,6 +228,7 @@
 <script src="js/sync-room.js"></script>
 <script src="js/peers.js"></script>
 <script src="js/events.js"></script>
+<script src="js/manual-tl.js"></script>
 <script src="js/main.js"></script>
 </body>
 </html>
