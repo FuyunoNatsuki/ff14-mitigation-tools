@@ -13,16 +13,6 @@ $html = [regex]::Replace($html, '<link rel="stylesheet" href="((?:css)/[^"]+)">'
 # <script src="data/... or js/..."></script> -> inline script
 $html = [regex]::Replace($html, '<script src="((?:data|js)/[^"]+)"></script>', {
   param($m) "<script>`n" + (& $read $m.Groups[1].Value).TrimEnd() + "`n</script>" })
-# config.js (database URL, not in git): inline it when it exists, otherwise drop the tag.
-# The output files contain the URL, so do not commit or publish dist/ or online/ outside your own use.
-$config = Join-Path $root 'config.js'
-$configTag = '<script src="config.js"></script>'
-if (Test-Path $config) {
-  $html = $html.Replace($configTag, "<script>`n" + ([IO.File]::ReadAllText($config, [Text.Encoding]::UTF8)).TrimEnd() + "`n</script>")
-} else {
-  Write-Warning 'config.js not found: shared rooms will not work in the built files (copy config.example.js to config.js).'
-  $html = $html.Replace($configTag, '')
-}
 
 New-Item -ItemType Directory -Force (Join-Path $root 'dist') | Out-Null
 [IO.File]::WriteAllText((Join-Path $root 'dist\MitigationPlanner.html'), $html, $utf8)

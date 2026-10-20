@@ -43,7 +43,8 @@ FINAL FANTASY XIV のレイド向けに、敵の攻撃に対する軽減の配�
 | `js/calc.js` | 被ダメージの計算 |
 | `js/render.js` | 画面の描画（メンバー表・タイムライン・予測表） |
 | `js/store-local.js` | このブラウザだけに保存する処理と、保存先の切り替え |
-| `js/sync-room.js` | URLで共有するルーム（Firebase） |
+| `js/sync-room.js` | URLで共有するルーム（中継サーバー経由） |
+| `worker/` | 共有ルームの中継サーバー（Cloudflare Workers）。公開ページには含めない |
 | `js/sync-claude.js` | claude.ai のページとして開いたときの共有 |
 | `js/peers.js` | 同時に開いている人の表示 |
 | `js/events.js` | ボタンや入力などの操作 |
@@ -51,7 +52,6 @@ FINAL FANTASY XIV のレイド向けに、敵の攻撃に対する軽減の配�
 | `ff14-mitigation.html` | 被ダメージ計算機 |
 | `index.html` | プランナーへ移動するだけのページ（GitHub Pages のトップ用） |
 | `fflogs-planner.html` | 旧URLで共有されたリンクを新しいページへ移すためのページ |
-| `config.example.js` | 手元用の設定（`config.js`）の見本 |
 | `.github/workflows/pages.yml` | GitHub Pages への公開（読み込みへのバージョン付け） |
 | `build.ps1` | 全部を1つのHTMLにまとめた版（`dist/MitigationPlanner.html` と claude.ai 用の `online/index.html`）を作るスクリプト |
 
@@ -61,4 +61,4 @@ FINAL FANTASY XIV のレイド向けに、敵の攻撃に対する軽減の配�
 
 main に push すると、GitHub Actions（`.github/workflows/pages.yml`）が GitHub Pages に公開します。そのとき `mitigation-planner.html` の `css/`・`js/`・`data/` の読み込みに `?v=コミットID` を付けるので、更新後にブラウザに古い CSS や JS が残っていても、新しいものが読み込まれます。手元のファイルには何も付けなくてかまいません。
 
-共有ルームのデータベースのURLはリポジトリに置いていません。公開時に、リポジトリの Secrets に登録した `MP_DB_URL` から `config.js` を作ります。手元で共有ルームを使うときは、`config.example.js` を `config.js` という名前でコピーしてURLを書いてください（`config.js` は git に入りません）。
+共有ルームのデータは、中継サーバー（`worker/`、Cloudflare Workers）を通して保存します。ブラウザがつなぐのは中継サーバーだけで、データベースのURLと鍵は中継サーバーの Secrets にだけ置いています。中継サーバーを更新するときは、`worker/` で `npx wrangler deploy` を実行してください。

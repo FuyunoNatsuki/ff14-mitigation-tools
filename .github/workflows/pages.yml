@@ -26,21 +26,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # データベースのURLはリポジトリに置かず、Secrets の MP_DB_URL から config.js を作る
-      - name: Write config.js from secrets
-        env:
-          MP_DB_URL: ${{ secrets.MP_DB_URL }}
-        run: |
-          if ! printf '%s' "$MP_DB_URL" | grep -Eq '^https://[a-z0-9.-]+\.(firebaseio\.com|firebasedatabase\.app)/?$'; then
-            echo "The MP_DB_URL secret is missing or is not a Firebase Realtime Database URL." >&2
-            exit 1
-          fi
-          printf "window.MP_DB_URL = '%s';\n" "${MP_DB_URL%/}" > config.js
-
       - name: Add a version to CSS/JS/data links
         run: |
           v="${GITHUB_SHA::8}"
-          sed -i -E "s#(href|src)=\"((css|js|data)/[^\"?]+|config\.js)\"#\1=\"\2?v=${v}\"#g" mitigation-planner.html
+          sed -i -E "s#(href|src)=\"((css|js|data)/[^\"?]+)\"#\1=\"\2?v=${v}\"#g" mitigation-planner.html
+
+      # 中継サーバーのソースは公開ページに含めない
+      - name: Leave the relay server out of the site
+        run: rm -rf worker
           count=$(grep -o "?v=${v}" mitigation-planner.html | wc -l)
           echo "versioned links: ${count}"
           test "${count}" -gt 0

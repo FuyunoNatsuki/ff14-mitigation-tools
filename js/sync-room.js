@@ -1,22 +1,24 @@
 'use strict';
-// URL で共有するルーム（Firebase Realtime Database）
+// URL で共有するルーム（中継サーバー経由で Firebase Realtime Database に保存）
 
-// ----- URLで共有するルーム（Firebase Realtime Database の REST API とストリーミング）-----
-// 共有ルームに使う Firebase Realtime Database のURL。リポジトリには書かず、config.js（git に入れない）で渡す。
-// 公開ページの config.js は、GitHub Actions が Secrets の MP_DB_URL から作る。
-const DEFAULT_DB_URL = typeof window.MP_DB_URL === 'string' ? window.MP_DB_URL : '';
+// ----- URLで共有するルーム（中継サーバーの REST とストリーミング）-----
+// ブラウザがつなぐのは中継サーバー（worker/ の Cloudflare Worker）だけ。データベースのURLは中継の中にしかない。
+const ROOM_API = 'https://mitigation-planner-rooms.mitigation-planner-rooms.workers.dev';
 const Room = {db:null, id:null, es:null, mirror:{}, clientId:uid(), hb:null, fightVer:null, baseTypes:{}, peers:[], connected:false, syncTimer:null};
-// Firebase のデータベース以外へは送らない
+// 中継サーバー（workers.dev か、手元で動かすときの localhost）以外へは送らない
 function normDb(u){
   u = String(u || '').trim().replace(/\/+$/, '');
-  if (!u) return '';
-  if (!/^https?:\/\//i.test(u)) u = 'https://' + u;
-  try { const x = new URL(u); if (x.protocol !== 'https:' || !/(^|\.)(firebaseio\.com|firebasedatabase\.app)$/.test(x.hostname)) return null; return x.origin; }
-  catch (e) { return null; }
+  if (!u || /REPLACE_ME/.test(u)) return '';
+  try {
+    const x = new URL(u);
+    const okRemote = x.protocol === 'https:' && /\.workers\.dev$/.test(x.hostname);
+    const okLocal = x.protocol === 'http:' && x.hostname === 'localhost';
+    return okRemote || okLocal ? x.origin : null;
+  } catch (e) { return null; }
 }
 const validRoomId = id => /^[a-z0-9]{12}$/.test(String(id || ''));
 const newRoomId = () => { const a = 'abcdefghijkmnpqrstuvwxyz23456789'; const b = new Uint8Array(12); crypto.getRandomValues(b); return [...b].map(x => a[x % a.length]).join(''); };
-const roomUrl = p => `${Room.db}/rooms/${Room.id}${p ? '/' + p : ''}.json`;
+const roomUrl = p => `${Room.db}/rooms/${Room.id}${p ? '/' + p : ''}`;
 const myName = () => ($('nick').value.trim() || '名無し').slice(0, 20);
 function shareLink(){ const base = location.href.split(/[?#]/)[0]; return `${base}?room=${Room.id}`; }
 
@@ -26,7 +28,7 @@ async function roomReq(method, path, body){
 }
 function roomWriteError(e){
   setStatus(e && e.message === 'denied'
-    ? 'ルームに書き込めませんでした。Firebase のルールが最新か（README の内容と同じか）確認してください。'
+    ? 'ルームに書き込めませんでした。共有ルームの設定（中継サーバーとデータベースのルール）を管理者に確認してもらってください。'
     : '保存に失敗しました。ネットワークを確認して、もう一度操作してください。', 'err');
 }
 const roomBody = e => { const o = {mitId:e.mitId, t:e.t, target:e.target, caster:e.caster || null, by:Room.clientId}; if (e.custom) o.custom = {...e.custom}; return o; };
@@ -126,15 +128,21 @@ async function startRoom(db, id, seed){
     fight = null; plan = []; renderAll();
   }
   setStatus('ルームに接続しています…');
+  openStream();
+  sendPresence();
+  Room.hb = setInterval(sendPresence, 15000);
+  window.addEventListener('pagehide', () => { try { fetch(roomUrl('presence/' + Room.clientId), {method:'DELETE', keepalive:true}); } catch (e) {} });
+}
+// ルームの変更をストリーミングで受け取る。中継サーバーの鍵が切り替わったとき（auth_revoked）はつなぎ直す
+function openStream(){
+  if (Room.es) Room.es.close();
   const es = new EventSource(roomUrl(''));
   Room.es = es;
   es.addEventListener('put', ev => { if (!Room.connected) { Room.connected = true; setStatus('ルームに接続しました。編集はすぐに全員へ反映されます。', 'ok'); } applyRoomEvent('put', JSON.parse(ev.data)); });
   es.addEventListener('patch', ev => applyRoomEvent('patch', JSON.parse(ev.data)));
-  es.addEventListener('cancel', () => { setStatus('ルームを読み込めませんでした。Firebase のルールとルームIDを確認してください。', 'err'); es.close(); });
+  es.addEventListener('auth_revoked', () => { es.close(); setTimeout(openStream, 500); });
+  es.addEventListener('cancel', () => { setStatus('ルームを読み込めませんでした。ルームIDを確認してください。', 'err'); es.close(); });
   es.onerror = () => { setStatus(Room.connected ? '接続が切れました。再接続しています…' : 'ルームに接続できません。ネットワークを確認してください。', 'err'); };
-  sendPresence();
-  Room.hb = setInterval(sendPresence, 15000);
-  window.addEventListener('pagehide', () => { try { fetch(roomUrl('presence/' + Room.clientId), {method:'DELETE', keepalive:true}); } catch (e) {} });
 }
 function leaveRoom(){
   if (Room.es) Room.es.close();
@@ -143,8 +151,8 @@ function leaveRoom(){
   fetch(roomUrl('presence/' + Room.clientId), {method:'DELETE'}).then(done, done);
 }
 function readDbInput(){
-  const db = normDb(DEFAULT_DB_URL);
-  if (!db) { setStatus('共有ルームのデータベースが設定されていません。', 'err'); return null; }
+  const db = normDb(ROOM_API);
+  if (!db) { setStatus('共有ルームの中継サーバーが設定されていません。', 'err'); return null; }
   return db;
 }
 $('roomCreate').addEventListener('click', () => {

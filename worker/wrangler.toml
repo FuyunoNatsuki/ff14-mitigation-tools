@@ -1,0 +1,12 @@
+# Mitigation Planner の共有ルーム用の中継サーバー（Cloudflare Workers）
+name = "mitigation-planner-rooms"
+main = "src/index.js"
+compatibility_date = "2025-06-01"
+
+[vars]
+# ブラウザからの呼び出しを許すページ（公開ページ、手元の確認用サーバー、file:// で開いたデスクトップ版）
+ALLOWED_ORIGINS = "https://fuyunonatsuki.github.io,http://localhost:8766,null"
+
+# Secrets（このファイルには書かない）:
+#   DB_URL      : npx wrangler secret put DB_URL
+#   FIREBASE_SA : npx wrangler secret put FIREBASE_SA  （サービスアカウントの鍵の JSON）
