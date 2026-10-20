@@ -33,7 +33,7 @@ function roomWriteError(e){
 }
 const roomBody = e => { const o = {mitId:e.mitId, t:e.t, target:e.target, caster:e.caster || null, by:Room.clientId}; if (e.custom) o.custom = {...e.custom}; if (e.ovr) o.ovr = {...e.ovr}; return o; };
 const roomFightBody = f => ({json:JSON.stringify(packFight(f)), ver:uid(), name:f.name, at:{'.sv':'timestamp'}});
-const roomMember = m => { const o = {job:m.job, name:m.name, pid:m.pid}; for (const k of STAT_KEYS) o[k] = m[k] || 0; return o; };
+const roomMember = m => { const o = {job:m.job, name:m.name, pid:m.pid, food:m.food || ''}; for (const k of STAT_KEYS) o[k] = m[k] || 0; return o; };
 const RoomOps = {
   add(e){ plan.push(e); renderAll(); roomReq('PUT', 'plan/' + e.uid, roomBody(e)).catch(roomWriteError); },
   update(e){ renderAll(); roomReq('PUT', 'plan/' + e.uid, roomBody(e)).catch(roomWriteError); },

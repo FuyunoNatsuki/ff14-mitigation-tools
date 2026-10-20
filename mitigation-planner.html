@@ -10,6 +10,8 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
 <link rel="stylesheet" href="css/planner.css">
 <script src="data/job-data.js"></script>
+<script src="data/foods.js"></script>
+<script src="data/gear.js"></script>
 <script src="data/mitigations.js"></script>
 <script src="data/heals.js"></script>
 </head>
@@ -131,10 +133,10 @@
     </div>
     <div class="fold-body">
     <div class="tbl-wrap"><table class="mtable">
-      <thead><tr><th>#</th><th>ジョブ</th><th>名前</th><th>ログのプレイヤー</th><th class="num">最大HP</th><th class="num">クリ</th><th class="num">意思</th><th class="num">不屈</th><th class="num">信仰</th><th class="num">SS</th><th class="num">物理防御</th><th class="num">魔法防御</th><th class="num">精神</th><th class="num">武器(魔)</th><th class="num">回復係数</th></tr></thead>
+      <thead><tr><th>#</th><th>ジョブ</th><th>名前</th><th>ログのプレイヤー</th><th>食事</th><th class="num">最大HP</th><th class="num">クリ</th><th class="num">意思</th><th class="num">不屈</th><th class="num">信仰</th><th class="num">SS</th><th class="num">物理防御</th><th class="num">魔法防御</th><th class="num">精神</th><th class="num">武器(魔)</th><th class="num">回復係数</th></tr></thead>
       <tbody id="mbody"></tbody>
     </table></div>
-    <p class="note">空欄の項目はジョブごとの標準値（<code>data/job-data.js</code> で管理）を使います。最大HPはログにHPがあればログの値が標準になります。被ダメージの計算に使うのは最大HP・不屈・物理防御・魔法防御です。回復量は、精神と武器(魔)（武器の魔法性能）が入っていれば回復計算式（意思・クリ・SS・不屈も使う）で、入っていなければ回復係数で簡易に計算します。信仰は記録用です。物理防御・魔法防御は「防御力の軽減を入れる」をオンにしたときだけ、入力のあるメンバーに掛かります。</p>
+    <p class="note">空欄の項目は、ジョブごとの装備プリセット（Patch7.55 最終装備、<code>data/gear.js</code>）の値を使います。表のステータスは食事を含まない装備だけの値で、「食事」で選んだ食事の分が計算のときに足されます（空欄なら装備プリセットで使っている食事）。最大HPはログにHPがあればログの値（その戦闘の食事込み）をそのまま使い、手入力や標準値のときは食事の VIT の分を足します。被ダメージの計算に使うのは最大HP・不屈・物理防御・魔法防御です。回復量は、精神と武器(魔)（武器の魔法性能）が入っていれば回復計算式（意思・クリ・SS・不屈も使う）で、入っていなければ回復係数で簡易に計算します。信仰は記録用です。物理防御・魔法防御は「防御力の軽減を入れる」をオンにしたときだけ、入力のあるメンバーに掛かります。</p>
     </div>
   </section>
 

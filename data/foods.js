@@ -1,0 +1,41 @@
+'use strict';
+// 食事（パッチ7.xで追加された、戦闘用のもの。製作・採集用は除く）。数値は HQ のもの。
+// params: {stat: 上がるステータス, pct: 上がる割合(%), max: 上限}。値は XIVAPI（ゲームデータ）から作っています。
+// 作り直すとき: node tools/gear/build-gear-data.mjs
+window.MP_FOODS = [
+  {"id":"f49239","name":"ナチョス","ilvl":770,"params":[{"stat":"crit","label":"クリティカル","pct":10,"max":151},{"stat":"vit","label":"VIT","pct":10,"max":297},{"stat":"ss","label":"スキルスピード","pct":10,"max":91}]},
+  {"id":"f49240","name":"キャラメルポップコーン","ilvl":770,"params":[{"stat":"det","label":"意思力","pct":10,"max":151},{"stat":"vit","label":"VIT","pct":10,"max":297},{"stat":"crit","label":"クリティカル","pct":10,"max":91}]},
+  {"id":"f49241","name":"プルーンパンズケーキ","ilvl":770,"params":[{"stat":"pie","label":"信仰","pct":10,"max":151},{"stat":"vit","label":"VIT","pct":10,"max":297},{"stat":"det","label":"意思力","pct":10,"max":91}]},
+  {"id":"f49242","name":"プルーンシュトレン","ilvl":770,"params":[{"stat":"ss","label":"スペルスピード","pct":10,"max":151},{"stat":"vit","label":"VIT","pct":10,"max":297},{"stat":"pie","label":"信仰","pct":10,"max":91}]},
+  {"id":"f49243","name":"ロネークグラタン","ilvl":770,"params":[{"stat":"ss","label":"スペルスピード","pct":10,"max":151},{"stat":"vit","label":"VIT","pct":10,"max":297},{"stat":"dh","label":"ダイレクトヒット","pct":10,"max":91}]},
+  {"id":"f49244","name":"ポポトポタージュ","ilvl":770,"params":[{"stat":"crit","label":"クリティカル","pct":10,"max":151},{"stat":"vit","label":"VIT","pct":10,"max":297},{"stat":"ss","label":"スペルスピード","pct":10,"max":91}]},
+  {"id":"f49245","name":"げんこつポポトのシチュー","ilvl":770,"params":[{"stat":"dh","label":"ダイレクトヒット","pct":10,"max":151},{"stat":"vit","label":"VIT","pct":10,"max":297},{"stat":"det","label":"意思力","pct":10,"max":91}]},
+  {"id":"f49246","name":"げんこつポポトのサラダ","ilvl":770,"params":[{"stat":"ss","label":"スキルスピード","pct":10,"max":151},{"stat":"vit","label":"VIT","pct":10,"max":297},{"stat":"dh","label":"ダイレクトヒット","pct":10,"max":91}]},
+  {"id":"f49247","name":"クラムケーキ","ilvl":770,"params":[{"stat":"ten","label":"不屈","pct":10,"max":151},{"stat":"vit","label":"VIT","pct":10,"max":297},{"stat":"det","label":"意思力","pct":10,"max":91}]},
+  {"id":"f49248","name":"クアホッグチャウダー","ilvl":770,"params":[{"stat":"det","label":"意思力","pct":10,"max":151},{"stat":"vit","label":"VIT","pct":10,"max":297},{"stat":"ten","label":"不屈","pct":10,"max":91}]},
+  {"id":"f46000","name":"ポン・デ・ケージョ","ilvl":740,"params":[{"stat":"dh","label":"ダイレクトヒット","pct":10,"max":142},{"stat":"vit","label":"VIT","pct":10,"max":246},{"stat":"det","label":"意思力","pct":10,"max":85}]},
+  {"id":"f46001","name":"タピオカミルクティー","ilvl":740,"params":[{"stat":"ss","label":"スキルスピード","pct":10,"max":142},{"stat":"vit","label":"VIT","pct":10,"max":246},{"stat":"dh","label":"ダイレクトヒット","pct":10,"max":85}]},
+  {"id":"f46002","name":"マテ・スイートティー","ilvl":740,"params":[{"stat":"crit","label":"クリティカル","pct":10,"max":142},{"stat":"vit","label":"VIT","pct":10,"max":246},{"stat":"ss","label":"スキルスピード","pct":10,"max":85}]},
+  {"id":"f46003","name":"高級マテ茶クッキー","ilvl":740,"params":[{"stat":"det","label":"意思力","pct":10,"max":142},{"stat":"vit","label":"VIT","pct":10,"max":246},{"stat":"crit","label":"クリティカル","pct":10,"max":85}]},
+  {"id":"f46004","name":"アルパカシチュー","ilvl":740,"params":[{"stat":"pie","label":"信仰","pct":10,"max":142},{"stat":"vit","label":"VIT","pct":10,"max":246},{"stat":"det","label":"意思力","pct":10,"max":85}]},
+  {"id":"f46005","name":"ロネーク・サルタード","ilvl":740,"params":[{"stat":"ss","label":"スペルスピード","pct":10,"max":142},{"stat":"vit","label":"VIT","pct":10,"max":246},{"stat":"pie","label":"信仰","pct":10,"max":85}]},
+  {"id":"f46006","name":"エンサラーダ・デ・ケソ","ilvl":740,"params":[{"stat":"ss","label":"スペルスピード","pct":10,"max":142},{"stat":"vit","label":"VIT","pct":10,"max":246},{"stat":"dh","label":"ダイレクトヒット","pct":10,"max":85}]},
+  {"id":"f46007","name":"モジェテ","ilvl":740,"params":[{"stat":"crit","label":"クリティカル","pct":10,"max":142},{"stat":"vit","label":"VIT","pct":10,"max":246},{"stat":"ss","label":"スペルスピード","pct":10,"max":85}]},
+  {"id":"f46008","name":"ウールバックハンバーグ","ilvl":740,"params":[{"stat":"ten","label":"不屈","pct":10,"max":142},{"stat":"vit","label":"VIT","pct":10,"max":246},{"stat":"det","label":"意思力","pct":10,"max":85}]},
+  {"id":"f46009","name":"ウールバックステーキ","ilvl":740,"params":[{"stat":"det","label":"意思力","pct":10,"max":142},{"stat":"vit","label":"VIT","pct":10,"max":246},{"stat":"ten","label":"不屈","pct":10,"max":85}]},
+  {"id":"f44175","name":"ローストチキン","ilvl":710,"params":[{"stat":"dh","label":"ダイレクトヒット","pct":10,"max":132},{"stat":"vit","label":"VIT","pct":10,"max":203},{"stat":"det","label":"意思力","pct":10,"max":79}]},
+  {"id":"f44176","name":"チキンパスタ","ilvl":710,"params":[{"stat":"ss","label":"スキルスピード","pct":10,"max":132},{"stat":"vit","label":"VIT","pct":10,"max":203},{"stat":"dh","label":"ダイレクトヒット","pct":10,"max":79}]},
+  {"id":"f44177","name":"シュラスコ","ilvl":710,"params":[{"stat":"crit","label":"クリティカル","pct":10,"max":132},{"stat":"vit","label":"VIT","pct":10,"max":203},{"stat":"ss","label":"スキルスピード","pct":10,"max":79}]},
+  {"id":"f44178","name":"ムケッカ","ilvl":710,"params":[{"stat":"det","label":"意思力","pct":10,"max":132},{"stat":"vit","label":"VIT","pct":10,"max":203},{"stat":"crit","label":"クリティカル","pct":10,"max":79}]},
+  {"id":"f44179","name":"シナモンホイップコーヒー","ilvl":710,"params":[{"stat":"pie","label":"信仰","pct":10,"max":132},{"stat":"vit","label":"VIT","pct":10,"max":203},{"stat":"det","label":"意思力","pct":10,"max":79}]},
+  {"id":"f44180","name":"コーヒーククルラスク","ilvl":710,"params":[{"stat":"ss","label":"スペルスピード","pct":10,"max":132},{"stat":"vit","label":"VIT","pct":10,"max":203},{"stat":"pie","label":"信仰","pct":10,"max":79}]},
+  {"id":"f44181","name":"ネーブルオレンジクッキー","ilvl":710,"params":[{"stat":"ss","label":"スペルスピード","pct":10,"max":132},{"stat":"vit","label":"VIT","pct":10,"max":203},{"stat":"dh","label":"ダイレクトヒット","pct":10,"max":79}]},
+  {"id":"f44182","name":"パインオレンジゼリー","ilvl":710,"params":[{"stat":"crit","label":"クリティカル","pct":10,"max":132},{"stat":"vit","label":"VIT","pct":10,"max":203},{"stat":"ss","label":"スペルスピード","pct":10,"max":79}]},
+  {"id":"f44183","name":"ロブスタービスク","ilvl":710,"params":[{"stat":"ten","label":"不屈","pct":10,"max":132},{"stat":"vit","label":"VIT","pct":10,"max":203},{"stat":"det","label":"意思力","pct":10,"max":79}]},
+  {"id":"f44184","name":"ボイルドロブスター","ilvl":710,"params":[{"stat":"det","label":"意思力","pct":10,"max":132},{"stat":"vit","label":"VIT","pct":10,"max":203},{"stat":"ten","label":"不屈","pct":10,"max":79}]},
+  {"id":"f44087","name":"アルパカクリームパスタ","ilvl":690,"params":[{"stat":"ss","label":"スペルスピード","pct":10,"max":121},{"stat":"vit","label":"VIT","pct":10,"max":177},{"stat":"dh","label":"ダイレクトヒット","pct":10,"max":73}]},
+  {"id":"f44090","name":"ブロコスピナッチソテー","ilvl":690,"params":[{"stat":"pie","label":"信仰","pct":10,"max":121},{"stat":"vit","label":"VIT","pct":10,"max":177},{"stat":"det","label":"意思力","pct":10,"max":73}]},
+  {"id":"f44096","name":"ベジタブルスープ","ilvl":690,"params":[{"stat":"dh","label":"ダイレクトヒット","pct":10,"max":121},{"stat":"vit","label":"VIT","pct":10,"max":177},{"stat":"det","label":"意思力","pct":10,"max":73}]},
+  {"id":"f44098","name":"メスキートスープ","ilvl":690,"params":[{"stat":"ss","label":"スキルスピード","pct":10,"max":121},{"stat":"vit","label":"VIT","pct":10,"max":177},{"stat":"dh","label":"ダイレクトヒット","pct":10,"max":73}]},
+  {"id":"f44104","name":"タコス・カルネ・アサーダ","ilvl":690,"params":[{"stat":"ten","label":"不屈","pct":10,"max":121},{"stat":"vit","label":"VIT","pct":10,"max":177},{"stat":"det","label":"意思力","pct":10,"max":73}]}
+];

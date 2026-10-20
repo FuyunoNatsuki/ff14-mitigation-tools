@@ -67,6 +67,7 @@ function renderMembers(){
       <td class="c-job"><div class="row" style="gap:6px;align-items:center;flex-wrap:nowrap">${jobBadge(m)}<select data-mjob="${m.id}" aria-label="${i + 1}人目のジョブ" ${readOnly ? 'disabled' : ''}>${JOB_ORDER.map(k => `<option value="${k}"${k === m.job ? ' selected' : ''}>${esc(JOB_DATA[k].ja)}</option>`).join('')}</select></div></td>
       <td class="c-name" data-label="名前"><input type="text" class="nm" maxlength="20" data-mname="${m.id}" value="${esc(m.name)}" placeholder="${esc((logPlayer(m) || {}).name || j.ja || '')}" aria-label="${i + 1}人目の名前" ${readOnly ? 'disabled' : ''}></td>
       <td class="c-pid" data-label="ログのプレイヤー"><select data-mpid="${m.id}" aria-label="${i + 1}人目に対応するログのプレイヤー" ${readOnly ? 'disabled' : ''}><option value="-1">なし（全体攻撃のみ）</option>${players.map(p => `<option value="${p.id}"${p.id === m.pid ? ' selected' : ''}>${esc(p.name)}</option>`).join('')}</select></td>
+      <td class="c-food" data-label="食事">${foodSelect(m, i)}</td>
       ${STAT_KEYS.map(num).join('')}</tr>`;
   }).join('');
 }
@@ -337,4 +338,19 @@ function renderJobFilter(){
     <button type="button" class="jf${fs.size ? '' : ' on'}" data-jobf="" aria-pressed="${!fs.size}">すべて</button>` +
     jobs.map(j => { const d = JOB_DATA[j]; const on = fs.has(j);
       return `<button type="button" class="jf${on ? ' on' : ''}" data-jobf="${j}" aria-pressed="${on}"><span class="jb ${d.role}">${esc(d.abbr)}</span>${esc(d.ja)}</button>`; }).join('');
+}
+
+// ===== 食事の選択（メンバー表）=====
+// 空：ジョブの装備プリセットの食事、none：食事なし。下に食事で上がる量を出す
+function foodSelect(m, i){
+  const preset = FOOD[(jobOf(m) || {}).food];
+  const opts = [['', `装備の食事（${preset ? preset.name : 'なし'}）`], ['none', '食事なし'], ...FOODS.map(f => [f.id, `${f.name}（IL${f.ilvl}）`])];
+  const cur = m.food || '';
+  const f = foodOf(m);
+  const label = {crit:'クリ', det:'意思', dh:'DH', ss:'SS', ten:'不屈', pie:'信仰', vit:'VIT'};
+  const gains = f ? f.params.map(p => { const v = foodBonus(m, p.stat); return v ? `${label[p.stat]}+${v}` : ''; }).filter(Boolean) : [];
+  const hp = foodHp(m), fromLog = !(m.hp > 0) && logPlayer(m) && logPlayer(m).maxHP;
+  const sub = f ? gains.join(' ') + (hp ? ` / HP+${fmt(hp)}${fromLog ? '（ログのHPには足さない）' : ''}` : '') : '食事による上昇なし';
+  return `<select data-mfood="${m.id}" aria-label="${i + 1}人目の食事" ${readOnly ? 'disabled' : ''}>${opts.map(([v, l]) => `<option value="${v}"${v === cur ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select>
+    <div class="sub food-gain">${esc(sub)}</div>`;
 }

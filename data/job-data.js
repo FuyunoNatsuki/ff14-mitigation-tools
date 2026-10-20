@@ -1,5 +1,7 @@
 // Mitigation Planner のジョブ別データ。
 // メンバーのステータスや最大HPが空欄のときは、ここの値を使います。
+// ※ クリ・意思・不屈・信仰・SS・精神・武器は、data/gear.js（装備プリセット）の値が優先されます。
+//   hp は「食事なし」の最大HPの目安です（食事の分は、選んだ食事の VIT から足します）。
 // 値は Lv100（パッチ7.x）の零式装備を想定した目安です。パッチや装備に合わせて書き換えてください。
 //
 //   hp   : 最大HP（ログにHPがあるメンバーはログの値を優先します）
@@ -57,6 +59,8 @@ window.MP_ACTION_ICONS = {
 window.MP_LEVEL = {
   main: 440, sub: 420, div: 2780,
   hmp: 268,
+  // VIT 1 あたりの最大HP（食事の VIT を HP に直すのに使う）。※ Lv100 の値は確認できていないので、目安の値です
+  hpPerVit: {tank: 34.6, other: 24.3},
   attr:  {tank: 100, healer: 115, melee: 100, ranged: 100, caster: 100},
   trait: {tank: 100, healer: 130, melee: 100, ranged: 100, caster: 100},
 };

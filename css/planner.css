@@ -261,3 +261,8 @@ section.fold.collapsed .fold-body{display:none}
 /* ===== 攻撃を追加 ===== */
 details.add-cast{margin-bottom:12px;border:1px dashed var(--line);border-radius:8px;padding:8px 12px}
 details.add-cast summary{cursor:pointer;font-weight:700;font-size:.84rem;color:var(--accent)}
+
+/* ===== 食事（メンバー表）===== */
+.mtable .c-food select{min-width:180px}
+.food-gain{margin-top:2px;white-space:normal;max-width:220px}
+@media (max-width:640px){ .mtable td.c-food{grid-column:1 / -1} .mtable .c-food select{min-width:0} .food-gain{max-width:none} }

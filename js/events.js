@@ -48,12 +48,13 @@ document.addEventListener('change', ev => {
     return ops().setOverride(t.dataset.ovr, v > 0 && v < 1e8 ? v : null);
   }
   // メンバーの編集
-  const mid = t.dataset.mjob || t.dataset.mname || t.dataset.mpid || t.dataset.mid;
+  const mid = t.dataset.mjob || t.dataset.mname || t.dataset.mpid || t.dataset.mfood || t.dataset.mid;
   if (mid) {
     const m = memberById(mid); if (!m) return;
     if (t.dataset.mjob) { if (!JOB_DATA[t.value]) return; m.job = t.value; }
     else if (t.dataset.mname) m.name = t.value.trim().slice(0, 20);
     else if (t.dataset.mpid) m.pid = Number.isInteger(+t.value) ? +t.value : -1;
+    else if (t.dataset.mfood) m.food = t.value === 'none' || FOOD[t.value] ? t.value : '';
     else if (t.dataset.mstat) m[t.dataset.mstat] = clampNum(t.value, 0, 9999999, 0);
     t.blur();
     return ops().setMember(m);

@@ -7,10 +7,33 @@ const memberById = id => members.find(m => m.id === id) || null;
 const isActiveId = id => activeMembers().some(m => m.id === id);
 const jobOf = m => JOB_DATA[m && m.job] || null;
 const roleOf = m => (jobOf(m) || {}).role || 'melee';
-const statOf = (m, k) => (m && m[k] > 0) ? m[k] : ((jobOf(m) || {})[k] || 0);
+// 装備だけの値（手入力があればそれ、なければジョブの装備プリセット）
+const baseStatOf = (m, k) => (m && m[k] > 0) ? m[k] : ((jobOf(m) || {})[k] || 0);
+// メンバーの食事：'none' は食事なし、空ならジョブの装備プリセットの食事
+function foodOf(m){
+  if (!m || m.food === 'none') return null;
+  return FOOD[m.food] || FOOD[(jobOf(m) || {}).food] || null;
+}
+// 食事で上がる量（素の値 × 割合、ただし上限まで）
+function foodBonus(m, k){
+  const f = foodOf(m);
+  const p = f && f.params.find(x => x.stat === k);
+  return p ? Math.min(Math.floor(baseStatOf(m, k) * p.pct / 100), p.max) : 0;
+}
+// 計算に使う値（装備＋食事）
+const statOf = (m, k) => baseStatOf(m, k) + (FOOD_STATS.has(k) ? foodBonus(m, k) : 0);
+// 食事の VIT で増える HP（VIT 1 あたりの HP は data/job-data.js の MP_LEVEL.hpPerVit）
+function foodHp(m){ return Math.floor(foodBonus(m, 'vit') * ((LV.hpPerVit || {})[roleOf(m) === 'tank' ? 'tank' : 'other'] || 0)); }
 function logPlayer(m){ return fight && m && m.pid >= 0 ? fight.playerMap.get(m.pid) || null : null; }
+// 食事なしの最大HP（ログのHPはその戦闘で食べていた食事込みなので、そのまま使う）
 function defaultHp(m){ const lp = logPlayer(m); return (lp && lp.maxHP) || (jobOf(m) || {}).hp || FALLBACK_HP[roleGroup(roleOf(m))]; }
-function hpOf(m){ return m.hp > 0 ? m.hp : defaultHp(m); }
+// 計算に使う最大HP：手入力か装備の HP に食事の分を足す。ログの HP はそのまま
+function hpOf(m){
+  if (m.hp > 0) return m.hp + foodHp(m);
+  const lp = logPlayer(m);
+  if (lp && lp.maxHP) return lp.maxHP;
+  return defaultHp(m) + foodHp(m);
+}
 function memberName(m){ if (!m) return '?'; const lp = logPlayer(m); return m.name || (lp && lp.name) || (jobOf(m) || {}).ja || m.job; }
 // 不屈による被ダメージ倍率（Lv100）
 function tenMul(m){
@@ -27,7 +50,8 @@ function defMul(m, type){
 }
 function normMember(id, x, fb){
   x = x && typeof x === 'object' ? x : {};
-  const o = {id, job:JOB_DATA[x.job] && JOB_ORDER.includes(x.job) ? x.job : fb.job, name:String(x.name || '').slice(0, 20), pid:Number.isInteger(+x.pid) ? +x.pid : fb.pid};
+  const o = {id, job:JOB_DATA[x.job] && JOB_ORDER.includes(x.job) ? x.job : fb.job, name:String(x.name || '').slice(0, 20), pid:Number.isInteger(+x.pid) ? +x.pid : fb.pid,
+    food:typeof x.food === 'string' && (x.food === 'none' || FOOD[x.food]) ? x.food : (fb.food || '')};
   for (const k of STAT_KEYS) o[k] = clampNum(x[k], 0, 9999999, 0);
   return o;
 }
@@ -36,7 +60,7 @@ function defaultMembers(f){
   const ps = f ? [...f.players].sort((a, b) => (ROLE_ORDER[jobRoleOfLog(a)] - ROLE_ORDER[jobRoleOfLog(b)]) || a.id - b.id) : [];
   return SLOT_IDS.map((id, i) => {
     const p = ps[i];
-    const o = {id, job:p ? (JOB_FROM_LOG[p.job] || DEFAULT_COMP[i]) : DEFAULT_COMP[i], name:'', pid:p ? p.id : -1};
+    const o = {id, job:p ? (JOB_FROM_LOG[p.job] || DEFAULT_COMP[i]) : DEFAULT_COMP[i], name:'', pid:p ? p.id : -1, food:''};
     for (const k of STAT_KEYS) o[k] = 0;
     return o;
   });
