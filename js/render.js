@@ -10,7 +10,7 @@ function iconHtml(def, kind, cls = ''){
 const jobBadge = m => { const j = jobOf(m); return `<span class="jb ${j ? j.role : 'none'}" title="${esc(j ? j.ja : '')}">${esc(j ? j.abbr : '?')}</span>`; };
 
 // ===== 描画 =====
-let EVALS = [];
+let EVALS = [], SIM = null;
 let drag = null, renderPending = false;
 function renderAll(){
   // ドラッグ中に他の人の更新が届いたら、離すまで描き直さない
@@ -21,6 +21,8 @@ function renderAll(){
   if (!fight) return renderEmpty();
   plan.forEach(fixEntry);
   EVALS = fight.casts.map(evalCast);
+  SIM = simulateHp(EVALS);
+  if (settings.hpSim) applyHpSim(EVALS, SIM);
   const vis = visibleCasts(EVALS);
   renderSummary(vis); renderPalette(); renderTimeline(vis); renderTable(vis); renderEdit(); renderInsertAt(); renderControls();
   if (mode === 'local') saveLocal();
@@ -43,7 +45,7 @@ function renderSummary(vis){
     <div><div class="lbl">表示中の攻撃</div><div class="big">${vis.length}</div></div>
     <div><div class="lbl">戦闘不能あり</div><div class="big" style="color:${bad ? 'var(--bad)' : 'var(--ok)'}">${bad}</div></div>
     <div><div class="lbl">残り15%未満</div><div class="big" style="color:${warn ? 'var(--warn)' : 'var(--fg)'}">${warn}</div></div>
-    <div><div class="lbl">配置した軽減</div><div class="big">${plan.filter(entryLive).length}</div></div>
+    <div><div class="lbl">配置したスキル</div><div class="big">${plan.filter(entryLive).length}</div></div>
     <div><div class="lbl">バリアで除外したヒット</div><div class="big">${fight.excluded}</div></div>`;
 }
 
@@ -71,11 +73,11 @@ function renderMembers(){
 
 function renderPalette(){
   const rows = activeMembers().map(m => {
-    const acts = MITS.filter(d => d.jobs.includes(m.job));
+    const acts = ACTIONS.filter(d => d.tab === settings.tab && d.jobs.includes(m.job));
     return `<div class="prow"><span class="who">${jobBadge(m)}<span style="overflow:hidden;text-overflow:ellipsis">${esc(memberName(m))}</span></span>
-      ${acts.map(d => `<button type="button" class="pbtn" data-add="${d.id}" data-caster="${m.id}" title="${esc(d.name)}: 物理${d.p}% 魔法${d.m}% ${d.d}秒 / リキャスト${d.r}秒" ${readOnly ? 'disabled' : ''}>${iconHtml(d, d.kind)}</button>`).join('') || '<span class="sub">配置できる軽減なし</span>'}</div>`;
+      ${acts.map(d => `<button type="button" class="pbtn" data-add="${d.id}" data-caster="${m.id}" title="${esc(actionTip(d))}" ${readOnly ? 'disabled' : ''}>${iconHtml(d, d.kind)}</button>`).join('') || '<span class="sub">配置できるスキルなし</span>'}</div>`;
   });
-  rows.push(`<div class="prow"><span class="who"><span class="jb none">他</span>自由入力</span><button type="button" class="pbtn" data-add="__custom" title="%と秒を指定して軽減を作る" ${readOnly ? 'disabled' : ''}>${iconHtml({name:'自作軽減', abbr:'＋', custom:true}, 'custom')}</button></div>`);
+  if (settings.tab === 'mit') rows.push(`<div class="prow"><span class="who"><span class="jb none">他</span>自由入力</span><button type="button" class="pbtn" data-add="__custom" title="%と秒を指定して軽減を作る" ${readOnly ? 'disabled' : ''}>${iconHtml({name:'自作軽減', abbr:'＋', custom:true}, 'custom')}</button></div>`);
   $('palette').innerHTML = rows.join('');
 }
 
@@ -116,8 +118,8 @@ function renderTimeline(vis){
   };
   // メンバーごとに、ジョブの軽減の並び順で行を固定する（時刻で並び替えない）
   for (const m of activeMembers()) {
-    html += `<div class="lab member">${jobBadge(m)}<span class="lname">${esc(memberName(m))}</span></div><div class="lane member" style="width:${W}px"></div>`;
-    const mine = plan.filter(e => !e.custom && e.caster === m.id);
+    html += `<div class="lab member">${jobBadge(m)}<span class="lname">${esc(memberName(m))}</span>${hpLowLabel(m)}</div><div class="lane member" style="width:${W}px">${hpSvg(m, W, pps)}</div>`;
+    const mine = plan.filter(e => !e.custom && e.caster === m.id && MIT[e.mitId].tab === settings.tab);
     const rows = new Map();
     for (const e of mine) { const rk = e.mitId + '|' + (MIT[e.mitId].kind === 'single' ? e.target : ''); (rows.get(rk) || rows.set(rk, []).get(rk)).push(e); }
     const ordered = [...rows.entries()].sort((a, b) => {
@@ -131,7 +133,7 @@ function renderTimeline(vis){
         list.map(e => barHtml(e, d, d.kind)).join('') + '</div>';
     }
   }
-  const customs = plan.filter(e => e.custom);
+  const customs = settings.tab === 'mit' ? plan.filter(e => e.custom) : [];
   if (customs.length) {
     html += `<div class="lab member"><span class="jb none">他</span>自由入力</div><div class="lane member" style="width:${W}px"></div>`;
     const rows = new Map();
@@ -173,9 +175,11 @@ function renderTable(vis){
       <td class="num c-left" data-label="最小残りHP">${w ?(w.left <= 0 ? '<span style="color:var(--bad)">0</span>' : fmt(w.left) + `<div class="sub">${esc(memberName(w.m))} ${w.leftPct.toFixed(0)}%</div>`) : '—'}</td>
       <td class="c-pill">${pill}</td></tr>`;
     if (openRows.has(c.id)) {
-      out += `<tr class="detail"><td colspan="9"><div class="tbl-wrap"><table class="ptable"><thead><tr><th>メンバー</th><th class="num">最大HP</th><th class="num">元ダメ</th><th class="num">軽減</th><th class="num">予測被ダメ</th><th class="num">残りHP</th><th class="num">ログ上の実ダメ</th></tr></thead><tbody>` +
+      out += `<tr class="detail"><td colspan="9"><div class="tbl-wrap"><table class="ptable"><thead><tr><th>メンバー</th><th class="num">最大HP</th><th class="num">被弾前HP</th><th class="num">バリア</th><th class="num">元ダメ</th><th class="num">軽減</th><th class="num">予測被ダメ</th><th class="num">残りHP</th><th class="num">ログ上の実ダメ</th></tr></thead><tbody>` +
         ev.rows.map(r => `<tr><td><div class="row" style="gap:6px;align-items:center;flex-wrap:nowrap">${jobBadge(r.m)}${esc(memberName(r.m))} <span class="sub">${r.nHits > 1 ? '×' + r.nHits : ''}</span>${r.estimated ? ' <span class="est">推定</span>' : ''}${ev.ovr ? ' <span class="manual">手入力</span>' : ''}</div></td>
           <td class="num">${fmt(r.hp)}</td>
+          <td class="num">${r.hpBefore != null ? (r.wasDead ? '<span style="color:var(--bad)">戦闘不能</span>' : fmt(r.hpBefore)) : '—'}</td>
+          <td class="num">${r.shieldBefore ? fmt(r.shieldBefore) : '—'}</td>
           <td class="num">${r.raw == null ? '除外' : fmt(r.raw)}</td>
           <td class="num">${((1 - r.mul) * 100).toFixed(1)}%</td>
           <td class="num">${r.dmg == null ? '—' : fmt(r.dmg)}</td>
@@ -207,7 +211,7 @@ function renderEdit(){
     : k === 'self' ? `<option value="${esc(e.caster)}">${esc(memberName(caster))}（自分）</option>`
     : (k === 'custom' ? '<option value="all">全員</option>' : '') + opts(activeMembers());
   box.hidden = false; box.dataset.uid = e.uid;
-  box.innerHTML = `<span class="name">${iconHtml(d, k)}${esc(d.name)} <span class="sub">${caster ? esc(memberName(caster)) + ' / ' : ''}物理${d.p}% / 魔法${d.m}% / ${d.d}秒${d.r ? ' / リキャスト' + d.r + '秒' : ''}</span></span>
+  box.innerHTML = `<span class="name">${iconHtml(d, k)}${esc(d.name)} <span class="sub">${caster ? esc(memberName(caster)) + ' / ' : ''}${esc(d.custom ? `物理${d.p}% / 魔法${d.m}% / ${d.d}秒` : actionTip(d).split(' / ').slice(1).join(' / '))}</span></span>
     <label class="f" for="edT">開始時刻<input type="text" id="edT" value="${fmtT(e.t)}" style="width:90px"></label>
     <label class="f" for="edTarget">対象<select id="edTarget" ${k === 'party' || k === 'self' ? 'disabled' : ''}>${targetOpts}</select></label>
     ${k === 'custom' ? `<label class="f" for="edP">物理%<input type="number" id="edP" value="${d.p}" min="0" max="100" style="width:80px"></label>
@@ -224,4 +228,63 @@ function renderControls(){
   $('importBtn').disabled = readOnly && mode === 'shared';
   $('demo').disabled = readOnly && mode === 'shared';
   $('sharedFight').disabled = readOnly;
+  // タブの選択状態と、ヒール・バリアの設定欄
+  for (const b of document.querySelectorAll('.tab')) b.setAttribute('aria-selected', String(b.dataset.tab === settings.tab));
+  $('healOpts').hidden = settings.tab !== 'heal';
+}
+
+// ===== スキルの説明（アイコンのツールチップ）=====
+function actionTip(d){
+  const parts = [d.name];
+  if (d.p || d.m) parts.push(d.p === d.m ? `軽減${d.p}%` : `物理${d.p}% 魔法${d.m}%`);
+  if (d.heal) parts.push(`回復 威力${d.heal}`);
+  if (d.hot) parts.push(`HoT 威力${d.hot.pot}×${Math.floor(d.hot.dur / 3)}回`);
+  if (d.shield) parts.push(d.shield.pct ? `バリア 回復量の${Math.round(d.shield.pct * 100)}%` : d.shield.pot ? `バリア 威力${d.shield.pot}` : `バリア 最大HPの${Math.round(d.shield.hpPct * 100)}%`);
+  if (d.healUp) parts.push(`回復魔法+${Math.round(d.healUp * 100)}%`);
+  if (d.recv) parts.push(`被回復+${Math.round(d.recv * 100)}%`);
+  if (d.recit) parts.push('次の鼓舞・意気・不撓・深謀がクリティカル確定');
+  if (d.ns) parts.push(`ニュートラルセクト中は回復量の${Math.round(d.ns * 100)}%のバリア`);
+  if (d.delay) parts.push(`${d.delay}秒後に発動`);
+  parts.push(`${d.d}秒 / リキャスト${d.r}秒`);
+  return parts.join(' / ');
+}
+
+// ===== HP の推移（メンバーの行に描く）=====
+const LANE_H = 28;
+function hpSvg(m, W, pps){
+  const pts = SIM && SIM.series.get(m.id);
+  if (!pts || !pts.length) return '';
+  const max = hpOf(m);
+  const y = v => (LANE_H - 2 - Math.max(0, Math.min(1, v / max)) * (LANE_H - 4)).toFixed(1);
+  const x = t => (t * pps).toFixed(1);
+  // 階段状の線：時刻ごとに直前の値から新しい値へ縦に移る
+  let hpTop = `M0,${y(pts[0][1])}`, shTop = `M0,${y(pts[0][1] + pts[0][2])}`;
+  let deadAt = null;
+  for (let i = 1; i < pts.length; i++) {
+    const [t, hp, sh, dead] = pts[i];
+    hpTop += ` H${x(t)} V${y(hp)}`;
+    shTop += ` H${x(t)} V${y(hp + sh)}`;
+    if (dead && deadAt == null) deadAt = t;
+  }
+  hpTop += ` H${W}`; shTop += ` H${W}`;
+  // バリアは HP の線の上に重ねた帯（HP の線を逆向きにたどって閉じる）
+  const hpArea = `${hpTop} V${LANE_H} H0 Z`;
+  const shArea = `${shTop} V${y(pts[pts.length - 1][1])} ${reverseStep(pts, x, y)} Z`;
+  const dead = deadAt != null ? `<rect class="dead" x="${x(deadAt)}" y="${LANE_H - 4}" width="${Math.max(0, W - deadAt * pps)}" height="4"></rect>` : '';
+  return `<svg class="hpsvg" viewBox="0 0 ${W} ${LANE_H}" preserveAspectRatio="none" aria-hidden="true"><path class="sh" d="${shArea}"></path><path class="hp" d="${hpArea}"></path>${dead}</svg>`;
+}
+// HP の階段線を右から左へたどる（バリアの帯の下側）
+function reverseStep(pts, x, y){
+  let d = '';
+  for (let i = pts.length - 1; i >= 1; i--) d += ` H${x(pts[i][0])} V${y(pts[i - 1][1])}`;
+  return d + ' H0';
+}
+// メンバー名の横に、戦闘中の最低HP（%）
+function hpLowLabel(m){
+  const pts = SIM && SIM.series.get(m.id);
+  if (!pts || pts.length < 2) return '';
+  const max = hpOf(m);
+  const dead = pts.some(p => p[3]);
+  const low = Math.min(...pts.map(p => p[1])) / max * 100;
+  return `<span class="hpnow" style="${dead ? 'color:var(--bad)' : low < 15 ? 'color:var(--warn)' : ''}">${dead ? '戦闘不能' : '最低' + low.toFixed(0) + '%'}</span>`;
 }

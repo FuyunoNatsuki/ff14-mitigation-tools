@@ -11,6 +11,7 @@
 <link rel="stylesheet" href="css/planner.css">
 <script src="data/job-data.js"></script>
 <script src="data/mitigations.js"></script>
+<script src="data/heals.js"></script>
 </head>
 <body>
 <div class="wrap" id="app">
@@ -124,7 +125,19 @@
   </section>
 
   <section class="card" id="planCard">
-    <h2>軽減タイムライン</h2>
+    <div class="tl-tools">
+      <h2 style="margin:0">タイムライン</h2>
+      <div class="tabs" role="tablist" aria-label="配置するスキルの種類">
+        <button type="button" role="tab" class="tab" id="tabMit" data-tab="mit">軽減</button>
+        <button type="button" role="tab" class="tab" id="tabHeal" data-tab="heal">ヒール・バリア</button>
+      </div>
+    </div>
+    <div class="row heal-opts" id="healOpts" style="gap:10px 16px;align-items:center;margin-bottom:12px">
+      <label class="toggle" for="hpSim"><input type="checkbox" id="hpSim"> HPの推移で判定する</label>
+      <label class="toggle" for="critExp" title="オフのときは、秘策などで確定のもの以外はクリティカルなしで計算します"><input type="checkbox" id="critExp"> 回復のクリティカルを期待値で入れる</label>
+      <label class="f" for="regenPct" style="flex-direction:row;align-items:center;gap:6px;white-space:nowrap">平常時の回復（3秒ごと、最大HPの）
+        <input type="number" id="regenPct" min="0" max="20" step="0.1" style="width:80px"> %</label>
+    </div>
     <div class="palette" id="palette"></div>
     <div class="tl-tools">
       <span class="insert-at" id="insertAt"></span>
@@ -140,10 +153,11 @@
     <div class="tl-outer" id="tlOuter"><div class="tl" id="tl"></div></div>
     <div class="legend" style="margin-top:10px">
       <span style="--c:var(--ok)">全員生存</span><span style="--c:var(--warn)">残り15%未満</span><span style="--c:var(--bad)">戦闘不能あり</span><span style="--c:var(--muted)">有効サンプルなし</span>
-      <span style="--c:var(--lane-party)">全体軽減</span><span style="--c:var(--lane-self)">自分だけ</span><span style="--c:var(--lane-single)">味方1人</span><span style="--c:var(--lane-custom)">自由入力</span>
+      <span style="--c:var(--lane-party)">全体</span><span style="--c:var(--lane-self)">自分だけ</span><span style="--c:var(--lane-single)">味方1人</span><span style="--c:var(--lane-custom)">自由入力</span>
+      <span style="--c:var(--hp-line)">HP（メンバーの行）</span><span style="--c:var(--shield-line)">バリア</span>
     </div>
     <div class="edit" id="editBox" hidden></div>
-    <p class="note">攻撃の目盛りか下の表の行をクリックすると、その時刻が軽減の配置位置になります。上のアイコンを押すと、そのメンバーの軽減が配置されます。バーはドラッグで移動、クリックで編集できます。バーの下の薄い線はリキャスト、斜線のバーはリキャスト中の重複です。</p>
+    <p class="note">攻撃の目盛りか下の表の行をクリックすると、その時刻が配置位置になります。上のアイコンを押すと、そのメンバーのスキルが配置されます。バーはドラッグで移動、クリックで編集できます。バーの下の薄い線はリキャスト、斜線のバーはリキャスト中の重複です。メンバーの行には、攻撃・回復・HoT・バリアを時刻順に計算したHPの推移（緑）とバリア（黄）が出ます。回復量は威力×回復係数×意思力で計算し、秘策の対象スキルはクリティカル確定、ニュートラルセクト中のアスペクト・ベネフィクとヘリオス・コンジャンクションにはバリアを足します。</p>
   </section>
 
   <section class="card">
@@ -172,6 +186,7 @@
 <script src="js/fflogs.js"></script>
 <script src="js/fight.js"></script>
 <script src="js/calc.js"></script>
+<script src="js/hp.js"></script>
 <script src="js/render.js"></script>
 <script src="js/store-local.js"></script>
 <script src="js/sync-claude.js"></script>

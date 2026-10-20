@@ -4,7 +4,7 @@
 // 初期化
 (function init(){
   const s = store.get('fflp-settings'); if (s) Object.assign(settings, s);
-  $('trait').checked = settings.trait; $('ten').checked = settings.ten !== false; $('defOn').checked = !!settings.def;$('zoom').value = String(settings.zoom); $('minDmg').value = settings.minDmg; $('scope').value = settings.scope;
+  $('trait').checked = settings.trait; $('ten').checked = settings.ten !== false; $('defOn').checked = !!settings.def; $('hpSim').checked = settings.hpSim !== false; $('critExp').checked = !!settings.critExp; $('regenPct').value = settings.regenPct || ''; if (!['mit', 'heal'].includes(settings.tab)) settings.tab = 'mit'; $('zoom').value = String(settings.zoom); $('minDmg').value = settings.minDmg; $('scope').value = settings.scope;
   const c = store.get('fflp-cred'); if (c) { $('cid').value = c.id || ''; $('csec').value = c.sec || ''; } else $('credBox').open = true;
   members = defaultMembers(null);
   if (window.claude && typeof window.claude.use === 'function') {

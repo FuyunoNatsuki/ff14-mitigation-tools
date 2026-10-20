@@ -73,6 +73,11 @@ document.addEventListener('change', ev => {
 $('trait').addEventListener('change', e => { settings.trait = e.target.checked; saveSettings(); renderAll(); });
 $('ten').addEventListener('change', e => { settings.ten = e.target.checked; saveSettings(); renderAll(); });
 $('defOn').addEventListener('change', e => { settings.def = e.target.checked; saveSettings(); renderAll(); });
+$('hpSim').addEventListener('change', e => { settings.hpSim = e.target.checked; saveSettings(); renderAll(); });
+$('critExp').addEventListener('change', e => { settings.critExp = e.target.checked; saveSettings(); renderAll(); });
+$('regenPct').addEventListener('change', e => { settings.regenPct = clampNum(e.target.value, 0, 20, 0); saveSettings(); renderAll(); });
+// タブ（軽減 / ヒール・バリア）の切り替え
+for (const b of document.querySelectorAll('.tab')) b.addEventListener('click', () => { settings.tab = b.dataset.tab; selEntry = null; saveSettings(); renderAll(); });
 $('zoom').addEventListener('change', e => { settings.zoom = +e.target.value; saveSettings(); renderAll(); });
 $('minDmg').addEventListener('input', e => { settings.minDmg = +e.target.value || 0; saveSettings(); renderAll(); });
 $('scope').addEventListener('change', e => { settings.scope = e.target.value; saveSettings(); renderAll(); });

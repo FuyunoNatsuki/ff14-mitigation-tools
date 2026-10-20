@@ -45,7 +45,8 @@ function evalCast(c){
     if (raw != null) { maxRaw = Math.max(maxRaw, raw); maxDmg = Math.max(maxDmg, dmg); if (!worst || row.leftPct < worst.leftPct) worst = row; }
   }
   const status = !worst ? 'none' : worst.left <= 0 ? 'bad' : worst.leftPct < 15 ? 'warn' : 'ok';
-  const shown = act.filter(e => e.target === 'all' || hitIds.has(e.target));
+  // 表の「有効な軽減」には軽減率のあるものだけ出す（回復だけのスキルは除く）
+  const shown = act.filter(e => { const d = defOf(e); return (d.p || d.m) && (e.target === 'all' || hitIds.has(e.target)); });
   return {c, key, type, rows, worst, maxRaw, maxDmg, maxActual, status, shown, ovr, logMax, targets:c.targets.length,
     hasTank:c.targets.some(x => (fight.playerMap.get(x.pid) || {}).role === 'tank')};
 }
