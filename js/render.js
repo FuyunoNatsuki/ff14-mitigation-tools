@@ -304,7 +304,7 @@ function renderEdit(){
     : (k === 'custom' ? '<option value="all">全員</option>' : '') + opts(activeMembers());
   box.hidden = false; box.dataset.uid = e.uid;
   box.innerHTML = `<span class="name">${iconHtml(d, k)}${esc(d.name)} <span class="sub">${caster ? esc(memberName(caster)) + ' / ' : ''}${esc(d.custom ? `物理${d.p}% / 魔法${d.m}% / ${d.d}秒` : actionTip(d).split(' / ').slice(1).join(' / '))}</span></span>
-    <label class="f" for="edT">開始時刻<input type="text" id="edT" value="${fmtT(e.t)}" style="width:90px"></label>
+    <label class="f" for="edT">開始時刻<input type="text" id="edT" class="tfield" inputmode="decimal" value="${fmtT(e.t)}" style="width:90px" autocomplete="off"></label>
     <label class="f" for="edTarget">対象<select id="edTarget" ${k === 'party' || k === 'self' ? 'disabled' : ''}>${targetOpts}</select></label>
     ${healOvrFields(e, d)}
     ${k === 'custom' ? `<label class="f" for="edP">物理%<input type="number" id="edP" value="${d.p}" min="0" max="100" style="width:80px"></label>

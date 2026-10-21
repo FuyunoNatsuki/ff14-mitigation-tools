@@ -43,7 +43,7 @@ function renderPhaseList(){
   const ps = (fight && fight.phases) || [];
   box.innerHTML = ps.length ? ps.map((p, i) => `<div class="ph-row">
       <input type="text" class="ph-name" data-phname="${esc(p.id)}" maxlength="20" value="${esc(p.name)}" placeholder="P${i + 1}" aria-label="フェーズ${i + 1}の名前" ${readOnly ? 'disabled' : ''}>
-      <input type="text" class="ph-start" data-phstart="${esc(p.id)}" value="${fmtT(p.start)}" aria-label="フェーズ${i + 1}の開始時刻" ${readOnly ? 'disabled' : ''}>
+      <input type="text" class="ph-start tfield" inputmode="decimal" autocomplete="off" data-phstart="${esc(p.id)}" value="${fmtT(p.start)}" aria-label="フェーズ${i + 1}の開始時刻" ${readOnly ? 'disabled' : ''}>
       <span class="sub">〜 ${fmtT(phaseEnd(p))}</span>
       <button type="button" class="btn danger small" data-phdel="${esc(p.id)}" ${readOnly ? 'disabled' : ''}>削除</button></div>`).join('')
     : '<p class="sub" style="margin:8px 0 0">まだフェーズはありません。下で開始時刻を入れて追加してください。</p>';

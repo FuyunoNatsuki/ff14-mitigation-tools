@@ -265,6 +265,9 @@ footer{font-size:.74rem;color:var(--muted);max-width:90ch}
 /* ===== 折り畳み ===== */
 .fold-head{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
 section.fold.sec-hidden{display:none}
+/* 分:秒の入力欄 */
+input.tfield{font-variant-numeric:tabular-nums}
+input.tfield.invalid{border-color:var(--bad);box-shadow:0 0 0 1px var(--bad)}
 .share-bar.fold-head .peers{margin-left:auto}
 /* 右上のメニュー（ハンバーガー） */
 .menu-wrap{position:relative;margin-left:auto;align-self:center}

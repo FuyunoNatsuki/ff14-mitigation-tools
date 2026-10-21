@@ -125,7 +125,7 @@
         <label class="f grow" for="newTlName">TLの名前
           <input type="text" id="newTlName" maxlength="60" placeholder="例: 零式4層 前半"></label>
         <label class="f" for="newTlLen" style="width:140px">戦闘の長さ（分:秒）
-          <input type="text" id="newTlLen" placeholder="10:00" autocomplete="off"></label>
+          <input type="text" id="newTlLen" class="tfield" inputmode="decimal" data-tfmt="whole" placeholder="10:00" autocomplete="off"></label>
         <button class="btn ghost" id="newTl" type="button">作る</button>
       </div>
       <p class="note">攻撃のない空のTLを作ります。攻撃は下の「攻撃ごとの予測」の「攻撃を追加」から入れてください。メンバーは今のメンバー表のまま使います。</p>
@@ -182,7 +182,7 @@
       <div id="phaseList"></div>
       <div class="row" style="margin-top:8px;align-items:flex-end">
         <label class="f" for="phName" style="width:160px">名前<input type="text" id="phName" maxlength="20" placeholder="例: P2"></label>
-        <label class="f" for="phStart" style="width:120px">開始（分:秒）<input type="text" id="phStart" placeholder="2:30.0" autocomplete="off"></label>
+        <label class="f" for="phStart" style="width:120px">開始（分:秒）<input type="text" id="phStart" class="tfield" inputmode="decimal" placeholder="2:30.0" autocomplete="off"></label>
         <button class="btn small" id="phAdd" type="button">フェーズを追加</button>
       </div>
       <p class="note">フェーズは「開始時刻」で区切ります（最初のフェーズは 0:00 から）。フェーズを選ぶとタイムラインと表がそのフェーズだけになりますが、前のフェーズで使ったスキルの効果時間・リキャストはそのまま引き継いで表示・計算します。開始時刻の欄が空なら、選んでいる攻撃の時刻を使います。</p>
@@ -229,7 +229,7 @@
     <details class="add-cast" id="addCastBox">
       <summary>攻撃を追加</summary>
       <div class="row" style="margin-top:10px">
-        <label class="f" for="acTime" style="width:110px">時刻（分:秒）<input type="text" id="acTime" placeholder="1:23.0" autocomplete="off"></label>
+        <label class="f" for="acTime" style="width:110px">時刻（分:秒）<input type="text" id="acTime" class="tfield" inputmode="decimal" placeholder="1:23.0" autocomplete="off"></label>
         <label class="f grow" for="acName" style="flex-basis:180px">攻撃の名前<input type="text" id="acName" maxlength="40" placeholder="例: 全体攻撃"></label>
         <label class="f" for="acType" style="width:110px">種別<select id="acType"><option value="mag">魔法</option><option value="phys">物理</option><option value="unique">特殊</option></select></label>
         <label class="f" for="acDmg" style="width:140px">元ダメ（1人あたり）<input type="number" id="acDmg" min="1" step="1000" placeholder="150000"></label>
@@ -259,6 +259,7 @@
 <script src="js/render.js"></script>
 <script src="js/store-local.js"></script>
 <script src="js/history.js"></script>
+<script src="js/timefield.js"></script>
 <script src="js/sync-claude.js"></script>
 <script src="js/sync-room.js"></script>
 <script src="js/peers.js"></script>
