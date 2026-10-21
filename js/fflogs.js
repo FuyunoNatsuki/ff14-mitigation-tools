@@ -107,7 +107,7 @@ async function loadReport(){
       setStatus('レポートを取得しています…');
       const d = await gql(`query($code:String!){reportData{report(code:$code){title
         fights{id name startTime endTime kill encounterID difficulty}
-        masterData{actors{id name type subType} abilities{gameID name type}}}}}`, {code:p.code});
+        masterData{actors{id name type subType petOwner} abilities{gameID name type}}}}}`, {code:p.code});
       const r = d.reportData.report;
       if (!r) throw new Error('レポートが見つかりません。非公開ログの場合は読み込めません。');
       reportCache = {code:p.code, title:r.title, fights:r.fights.filter(f => f.encounterID > 0),
@@ -126,24 +126,58 @@ async function loadReport(){
   } finally { $('load').disabled = false; }
 }
 
-async function loadFight(fid){
-  const r = reportCache, f = r.fights.find(x => x.id === fid);
-  if (!f) return;
-  setStatus(`「${f.name}」の被ダメージを取得しています…`);
+// 戦闘のイベントを、ページを送りながらすべて取る（dataType: DamageTaken / Casts）
+async function fetchEvents(r, f, dataType, label){
   const events = [];
   let start = f.startTime;
   for (let page = 0; page < 50 && start != null; page++) {
     const d = await gql(`query($code:String!,$fid:Int!,$s:Float!,$e:Float!){reportData{report(code:$code){
-      events(fightIDs:[$fid],startTime:$s,endTime:$e,dataType:DamageTaken,hostilityType:Friendlies,includeResources:true,limit:10000){data nextPageTimestamp}}}}`,
-      {code:r.code, fid, s:start, e:f.endTime});
+      events(fightIDs:[$fid],startTime:$s,endTime:$e,dataType:${dataType},hostilityType:Friendlies,includeResources:${dataType === 'DamageTaken'},limit:10000){data nextPageTimestamp}}}}`,
+      {code:r.code, fid:f.id, s:start, e:f.endTime});
     const ev = d.reportData.report.events;
     events.push(...ev.data);
     start = ev.nextPageTimestamp;
-    setStatus(`「${f.name}」の被ダメージを取得しています…（${events.length}件）`);
+    setStatus(`「${f.name}」の${label}を取得しています…（${events.length}件）`);
   }
+  return events;
+}
+
+// ログで実際に使われた軽減・ヒール・バリアを、プランの形にする。使う人・対象はログのプレイヤーID（fixEntry でメンバーに直す）
+function planFromCasts(events, f, actors){
+  const owner = id => { const a = actors.get(id); return a && a.petOwner > 0 ? a.petOwner : id; }; // フェアリーなどのペットは主のプレイヤー
+  const out = [];
+  for (const e of events) {
+    if (e.type !== 'cast') continue;
+    const id = SKILL_BY_GAME_ID.get(e.abilityGameID);
+    const d = id && MIT[id];
+    if (!d) continue;
+    const caster = owner(e.sourceID);
+    const tgt = e.targetID > 0 ? owner(e.targetID) : -1;
+    const tgtIsPlayer = (actors.get(tgt) || {}).type === 'Player';
+    out.push({mitId:id, t:Math.max(0, Math.round((e.timestamp - f.startTime) / 100) / 10), caster,
+      target:d.kind === 'party' ? 'all' : d.kind === 'single' && tgtIsPlayer ? tgt : caster});
+  }
+  return out;
+}
+
+async function loadFight(fid){
+  const r = reportCache, f = r.fights.find(x => x.id === fid);
+  if (!f) return;
+  const fromLog = settings.mitSource === 'log';
+  setStatus(`「${f.name}」の被ダメージを取得しています…`);
+  const events = await fetchEvents(r, f, 'DamageTaken', '被ダメージ');
   const actors = new Map(r.actors.map(a => [a.id, a]));
   const abilities = new Map(r.abilities.map(a => [a.gameID, a]));
   const loaded = buildFight({code:r.code, fightId:fid, name:f.name, startTime:f.startTime, duration:f.endTime - f.startTime, events, actors, abilities});
-  await ops().loadFight(loaded, null, null);
-  setStatus(`${r.title} / ${f.name} を読み込みました${mode === 'room' ? '（ルームの全員に共有）' : ''}。攻撃 ${loaded.casts.length} 回、バリアで除外したヒット ${loaded.excluded} 件。`, 'ok');
+  // 軽減：ログで実際に使われたもの、または今のプランの軽減（戦闘を開いていないときは、その戦闘で前に保存したプラン）
+  let planList = null, note = '';
+  if (fromLog) {
+    planList = planFromCasts(await fetchEvents(r, f, 'Casts', 'スキルの使用'), f, actors);
+    note = `ログで使われた軽減・回復 ${planList.length} 件を配置しました。`;
+  } else if (fight) {
+    planList = plan.map(cleanEntry);
+    note = `今のプランの軽減 ${planList.length} 件をそのまま使います。`;
+  }
+  await ops().loadFight(loaded, planList, null);
+  setStatus(`${r.title} / ${f.name} を読み込みました${mode === 'room' ? '（ルームの全員に共有）' : ''}。攻撃 ${loaded.casts.length} 回、バリアで除外したヒット ${loaded.excluded} 件。${note}`, 'ok');
 }

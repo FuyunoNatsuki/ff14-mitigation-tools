@@ -1,7 +1,12 @@
 'use strict';
 // 戦闘データの組み立て（ログ→攻撃一覧）、保存用の形式
 
-// FF Logs のイベント配列から攻撃一覧を作る
+// ログの攻撃の種類（FF Logs の ability.type）を、物理・魔法・特殊に分ける
+const typeOfLog = t => +t === 128 ? 'phys' : +t === 1024 ? 'mag' : 'unique';
+
+// FF Logs のイベント配列から攻撃一覧を作る。
+// 元ダメージは「防御力を計上する前」の値にして持つ：ログの元ダメージ（受けた人の防御力の分が引かれた値とみなす）を、
+// その人のジョブの装備プリセットの防御力の倍率で割り戻す
 function buildFight({code, fightId, name, startTime, duration, events, actors, abilities}){
   // damage と calculateddamage のうち、元ダメージを持つ方を使う
   const has = t => events.filter(e => e.type === t && e.unmitigatedAmount != null).length;
@@ -24,8 +29,10 @@ function buildFight({code, fightId, name, startTime, duration, events, actors, a
     const valid = unmit != null && absorbed <= 0;
     if (!valid) excluded++;
     const ab = abilities.get(e.abilityGameID);
+    const src = actors.get(e.sourceID);
     hits.push({t:e.timestamp - startTime, abilityId:e.abilityGameID, abilityName:ab ? ab.name : ('#' + e.abilityGameID),
-      abilityType:ab ? +ab.type : 0, targetId:tgt.id, unmit:valid ? unmit : null, actual:(e.amount || 0) + absorbed, valid});
+      abilityType:ab ? +ab.type : 0, targetId:tgt.id, src:src ? src.name : String(e.sourceID),
+      unmit:valid ? unmit / logDefMul(pl, typeOfLog(ab && ab.type)) : null, actual:(e.amount || 0) + absorbed, valid});
   }
   return makeFight({key:code + '-' + fightId, name, duration, players:[...players.values()], hits, excluded});
 }
@@ -39,15 +46,27 @@ function makeFight({key, name, duration, players, hits, excluded, sample}){
   for (const h of hits) {
     let g = open.get(h.abilityId);
     if (!g || h.t - g.last > CLUSTER_GAP) {
-      g = {t:h.t, last:h.t, abilityId:h.abilityId, name:h.abilityName, hits:[]};
+      g = {t:h.t, last:h.t, abilityId:h.abilityId, name:h.abilityName, src:h.src, hits:[]};
       groups.push(g); open.set(h.abilityId, g);
     }
     g.last = h.t; g.hits.push(h);
-    if (!(h.abilityId in abilityTypes)) abilityTypes[h.abilityId] = h.abilityType === 128 ? 'phys' : h.abilityType === 1024 ? 'mag' : 'unique';
+    if (!(h.abilityId in abilityTypes)) abilityTypes[h.abilityId] = typeOfLog(h.abilityType);
+  }
+  // 攻撃ごとの元ダメージ（防御力を計上する前）の中央値
+  for (const g of groups) {
+    const vals = g.hits.filter(h => h.valid).map(h => h.unmit).sort((a, b) => a - b);
+    g.median = vals.length ? vals[Math.floor(vals.length / 2)] : null;
+  }
+  // バリアで全員のダメージが吸収されて元ダメージがない攻撃は、同じ敵の同じ攻撃（別のタイミング）のうち、
+  // 時刻がいちばん近いものの中央値を使う
+  for (const g of groups) {
+    if (g.median != null || sample) continue;
+    let ref = null;
+    for (const o of groups) if (o !== g && o.median != null && o.abilityId === g.abilityId && o.src === g.src && (!ref || Math.abs(o.t - g.t) < Math.abs(ref.t - g.t))) ref = o;
+    if (ref) { g.median = ref.median; g.from = Math.round(ref.t); }
   }
   const casts = groups.map(g => {
-    const vals = g.hits.filter(h => h.valid).map(h => h.unmit).sort((a, b) => a - b);
-    const median = vals.length ? vals[Math.floor(vals.length / 2)] : null;
+    const median = g.median;
     const by = new Map();
     for (const h of g.hits) {
       if (!by.has(h.targetId)) by.set(h.targetId, {pid:h.targetId, raw:0, est:false, n:0, actual:0, missing:false});
@@ -58,11 +77,15 @@ function makeFight({key, name, duration, players, hits, excluded, sample}){
       else o.missing = true;
     }
     const targets = [...by.values()].map(o => ({pid:o.pid, raw:o.missing ? null : Math.round(o.raw), est:o.est, n:o.n, actual:Math.round(o.actual)}));
-    return {t:Math.round(g.t), abilityId:g.abilityId, name:g.name, nHits:g.hits.length, nExcl:g.hits.filter(h => !h.valid).length, targets};
+    const c = {t:Math.round(g.t), abilityId:g.abilityId, name:g.name, nHits:g.hits.length, nExcl:g.hits.filter(h => !h.valid).length, targets};
+    if (g.from != null) c.from = g.from;
+    return c;
   });
   return finishFight({key, name, duration, players, casts, abilityTypes, excluded, sample:!!sample});
 }
 function finishFight(f){
+  // 元ダメージは防御力を計上する前の値（古い形式は unpackFight で直してから渡す）
+  f.defBase = true;
   f.playerMap = new Map(f.players.map(p => [p.id, p]));
   f.casts.forEach((c, i) => c.id = i);
   f.phases = cleanPhases(f.phases, f.duration);
@@ -71,17 +94,27 @@ function finishFight(f){
 
 // 共有・保存用のコンパクトな形式
 function packFight(f){
-  return {key:f.key, name:f.name, duration:f.duration, excluded:f.excluded, sample:!!f.sample, manual:!!f.manual, phases:(f.phases || []).map(p => ({id:p.id, name:p.name, start:p.start})),
+  return {key:f.key, name:f.name, duration:f.duration, excluded:f.excluded, sample:!!f.sample, manual:!!f.manual, defBase:1, phases:(f.phases || []).map(p => ({id:p.id, name:p.name, start:p.start})),
     players:f.players.map(p => ({id:p.id, name:p.name, job:p.job, role:p.role, maxHP:p.maxHP || 0})),
     abilityTypes:{...f.abilityTypes},
-    casts:f.casts.map(c => [c.t, c.abilityId, c.name, c.nHits, c.nExcl, c.targets.map(x => [x.pid, x.raw, x.est ? 1 : 0, x.n, x.actual]), c.manual ? 1 : 0])};
+    casts:f.casts.map(c => [c.t, c.abilityId, c.name, c.nHits, c.nExcl, c.targets.map(x => [x.pid, x.raw, x.est ? 1 : 0, x.n, x.actual]), c.manual ? 1 : 0, c.from == null ? null : c.from])};
 }
 function unpackFight(p){
   if (!p || !Array.isArray(p.players) || !Array.isArray(p.casts)) throw new Error('bad fight');
-  return finishFight({key:String(p.key || 'imported'), name:String(p.name || '戦闘'), duration:+p.duration || 0, excluded:+p.excluded || 0, sample:!!p.sample, manual:!!p.manual, phases:p.phases,
+  const f = {key:String(p.key || 'imported'), name:String(p.name || '戦闘'), duration:+p.duration || 0, excluded:+p.excluded || 0, sample:!!p.sample, manual:!!p.manual, phases:p.phases,
     players:p.players.map(x => ({id:+x.id, name:String(x.name || '?'), job:String(x.job || ''), role:['tank','healer','dps'].includes(x.role) ? x.role : 'dps', maxHP:+x.maxHP || 0})),
     abilityTypes:Object.assign({}, p.abilityTypes || {}),
     casts:p.casts.map(c => ({t:+c[0], abilityId:c[1], name:String(c[2]), nHits:+c[3], nExcl:+c[4],
-      targets:c[5].map(x => ({pid:+x[0], raw:x[1] == null ? null : +x[1], est:!!x[2], n:+x[3], actual:+x[4]})), manual:!!c[6]}))});
+      targets:c[5].map(x => ({pid:+x[0], raw:x[1] == null ? null : +x[1], est:!!x[2], n:+x[3], actual:+x[4]})), manual:!!c[6],
+      ...(Number.isFinite(c[7]) ? {from:+c[7]} : {})}))};
+  // 古い形式（ログの元ダメージをそのまま持っていたもの）は、防御力を計上する前の値に直す。手入力の攻撃はそのまま
+  if (!p.defBase) {
+    const byId = new Map(f.players.map(x => [x.id, x]));
+    for (const c of f.casts) if (!c.manual) {
+      const type = typeOfLog({phys:128, mag:1024}[f.abilityTypes[c.abilityId]]);
+      for (const x of c.targets) if (x.raw != null) x.raw = Math.round(x.raw / logDefMul(byId.get(x.pid), type));
+    }
+  }
+  return finishFight(f);
 }
 

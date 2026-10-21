@@ -1,4 +1,4 @@
-// data/icons.js（スキルとジョブの公式アイコン）を作り直すスクリプト（Node.js 18 以上）。
+// data/icons.js（スキルとジョブの公式アイコン）と data/action-ids.js（スキルのゲーム内ID）を作り直すスクリプト（Node.js 18 以上）。
 //   node tools/icons/build-icons.mjs
 // - スキル：data/mitigations.js と data/heals.js の日本語名で XIVAPI（ゲームデータ）の Action を探し、そのアイコンを使う
 // - ジョブ：ゲーム内のジョブアイコン（062100 + ClassJob の番号）
@@ -35,8 +35,11 @@ vm.createContext(ctx);
 for (const f of ['data/mitigations.js', 'data/heals.js']) vm.runInContext(fs.readFileSync(path.join(root, f), 'utf8'), ctx);
 const skills = vm.runInContext('[...MITS, ...HEALS]', ctx);
 
-const actions = {}, picked = {};
+const actions = {}, picked = {}, actionIds = {};
 for (const s of skills) {
+  // FF Logs のログでスキルを見分けるためのゲーム内ID（同じ名前のプレイヤーのスキル。PvP 用などを含む）
+  const all = await get('search', {sheets:'Action', query:`Name="${s.name}"`, language:'ja', fields:'IsPlayerAction', limit:'50'});
+  actionIds[s.id] = [...new Set([PICK[s.id], ...all.results.filter(x => x.fields.IsPlayerAction).map(x => x.row_id)].filter(Boolean))].sort((a, b) => a - b);
   let row;
   if (PICK[s.id]) {
     row = (await get(`sheet/Action/${PICK[s.id]}`, {language:'ja', fields:'Name,Icon'})).fields;
@@ -53,6 +56,8 @@ for (const s of skills) {
   if (!row) { console.warn(`見つからない: ${s.id} ${s.name}`); continue; }
   actions[s.id] = await png(row.Icon.path);
   picked[s.id] = {action:row.row_id, icon:row.Icon.id};
+  // エウクラシア系など、プレイヤーのスキルとして登録されていないものは、アイコンに使った Action の番号を入れる
+  if (!actionIds[s.id].includes(row.row_id)) actionIds[s.id] = [...actionIds[s.id], row.row_id].sort((a, b) => a - b);
   console.log(`${s.id.padEnd(13)} ${String(row.row_id).padStart(6)} ${row.Name}`);
 }
 
@@ -76,4 +81,10 @@ ${Object.entries(jobs).map(([k, v]) => `    ${k}: ${JSON.stringify(v)},`).join('
 };
 `;
 fs.writeFileSync(path.join(root, 'data/icons.js'), out);
+fs.writeFileSync(path.join(root, 'data/action-ids.js'), `'use strict';
+// スキルのゲーム内ID（FF Logs のログで使われたスキルを見分けるのに使う）。tools/icons/build-icons.mjs で作ったファイルです
+window.MP_ACTION_IDS = {
+${Object.entries(actionIds).map(([k, v]) => `  ${JSON.stringify(k)}: ${JSON.stringify(v)},`).join('\n')}
+};
+`);
 console.log(`data/icons.js: スキル ${Object.keys(actions).length} / ${skills.length}、ジョブ ${Object.keys(jobs).length}、${Math.round(out.length / 1024)}KB`);

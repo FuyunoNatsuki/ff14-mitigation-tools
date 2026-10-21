@@ -10,7 +10,7 @@ const REGEN_PCT = 1;          // 平常時の回復：3秒ごとに最大HPの1%
 const subOver = (m, k) => Math.max(statOf(m, k), LV.sub) - LV.sub;
 const fHMP  = m => Math.floor(100 * (statOf(m, 'mnd') - LV.main) / LV.hmp) + 100;              // f(回復魔法力)
 const fDET  = m => Math.floor(140 * (Math.max(statOf(m, 'det'), LV.main) - LV.main) / LV.div + 1000); // f(意思力)
-const fTNC  = m => Math.floor(110 * subOver(m, 'ten') / LV.div + 1000);                             // f(不屈)
+const fTNC  = m => Math.floor(112 * subOver(m, 'ten') / LV.div + 1000);                             // f(不屈)（7.0 から 112。Allagan Studies）
 const fSPD  = m => Math.floor(130 * subOver(m, 'ss') / LV.div + 1000);                              // f(スペルスピード)
 const fWD   = m => Math.floor(LV.main * ((LV.attr || {})[roleOf(m)] || 100) / 1000 + statOf(m, 'wd')); // f(武器)
 const fCRIT = m => Math.floor(200 * subOver(m, 'crit') / LV.div + 1400);                            // クリティカル倍率（‰）

@@ -33,7 +33,7 @@ function validEntry(e){ return e && (e.custom || Object.hasOwn(MIT, e.mitId)) &&
 function toEntry(id, x){
   const tgt = x.target === 'all' ? 'all' : (typeof x.target === 'string' && SLOT_IDS.includes(x.target)) ? x.target : (Number.isFinite(+x.target) ? +x.target : 'all');
   const e = {uid:String(id), mitId:String(x.mitId || ''), t:clampNum(x.t, 0, 3600, NaN), target:tgt,
-    caster:typeof x.caster === 'string' && SLOT_IDS.includes(x.caster) ? x.caster : null, by:typeof x.by === 'string' ? x.by : null};
+    caster:typeof x.caster === 'string' && SLOT_IDS.includes(x.caster) ? x.caster : Number.isInteger(x.caster) ? x.caster : null, by:typeof x.by === 'string' ? x.by : null};
   // 手入力の回復量・HoT・バリア量（1人あたり）
   const ovr = cleanOvr(x.ovr); if (ovr) e.ovr = ovr;
   if (x.custom && typeof x.custom === 'object') e.custom = {name:String(x.custom.name || '自作軽減').slice(0, 30), p:clampNum(x.custom.p, 0, 100, 0), m:clampNum(x.custom.m, 0, 100, 0), d:clampNum(x.custom.d, 1, 600, 1)};

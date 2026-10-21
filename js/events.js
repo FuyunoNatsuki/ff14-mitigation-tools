@@ -48,13 +48,14 @@ document.addEventListener('change', ev => {
     return ops().setOverride(t.dataset.ovr, v > 0 && v < 1e8 ? v : null);
   }
   // メンバーの編集
-  const mid = t.dataset.mjob || t.dataset.mname || t.dataset.mpid || t.dataset.mfood || t.dataset.mid;
+  const mid = t.dataset.mjob || t.dataset.mname || t.dataset.mpid || t.dataset.mfood || t.dataset.mrace || t.dataset.mid;
   if (mid) {
     const m = memberById(mid); if (!m) return;
     if (t.dataset.mjob) { if (!JOB_DATA[t.value]) return; m.job = t.value; }
     else if (t.dataset.mname) m.name = t.value.trim().slice(0, 20);
     else if (t.dataset.mpid) m.pid = Number.isInteger(+t.value) ? +t.value : -1;
     else if (t.dataset.mfood) m.food = t.value === 'none' || FOOD[t.value] ? t.value : '';
+    else if (t.dataset.mrace) m.race = CLAN[t.value] ? t.value : '';
     else if (t.dataset.mstat) m[t.dataset.mstat] = clampNum(t.value, 0, 9999999, 0);
     t.blur();
     return ops().setMember(m);
@@ -81,7 +82,8 @@ document.addEventListener('change', ev => {
 });
 $('trait').addEventListener('change', e => { settings.trait = e.target.checked; saveSettings(); renderAll(); });
 $('ten').addEventListener('change', e => { settings.ten = e.target.checked; saveSettings(); renderAll(); });
-$('defOn').addEventListener('change', e => { settings.def = e.target.checked; saveSettings(); renderAll(); });
+// ログを読み込むときの軽減（今のプランの軽減 / ログで実際に使われた軽減）
+$('mitSource').addEventListener('change', e => { settings.mitSource = e.target.value === 'log' ? 'log' : 'plan'; saveSettings(); });
 $('hpSim').addEventListener('change', e => { settings.hpSim = e.target.checked; saveSettings(); renderAll(); });
 $('critExp').addEventListener('change', e => { settings.critExp = e.target.checked; saveSettings(); renderAll(); });
 // タブ（軽減 / ヒール・バリア）の切り替え

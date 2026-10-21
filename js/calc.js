@@ -32,22 +32,35 @@ function evalCast(c){
     else if (aoe) { raw = ovr != null ? ovr : median; est = ovr == null; }
     else continue;
     hitIds.add(m.id);
-    let mul = 1;
-    for (const e of act) if (e.target === 'all' || e.target === m.id) mul *= 1 - rateOf(defOf(e), type) / 100;
-    if (settings.trait && roleOf(m) === 'tank') mul *= 0.8;
-    mul *= tenMul(m) * defMul(m, type);
+    // 元ダメージ（防御力を計上する前）× 軽減 × タンク特性 × 不屈 × そのメンバーの防御力
+    let mit = 1;
+    for (const e of act) if (e.target === 'all' || e.target === m.id) mit *= 1 - rateOf(defOf(e), type) / 100;
+    if (settings.trait && roleOf(m) === 'tank') mit *= 0.8;
+    mit *= tenMul(m);
+    const dm = defMul(m, type), mul = mit * dm;
     const dmg = raw == null ? null : Math.floor(raw * mul);
     const hp = hpOf(m);
     const left = dmg == null ? null : hp - dmg;
-    const row = {m, raw, estimated:est, nHits:n, actual, mul, dmg, hp, left, leftPct:left == null ? null : left / hp * 100};
+    const row = {m, raw, estimated:est, nHits:n, actual, mit, defVal:defValueOf(m, type), defMul:dm, afterDef:raw == null ? null : Math.floor(raw * dm),
+      mul, dmg, hp, left, leftPct:left == null ? null : left / hp * 100};
     rows.push(row);
     if (actual != null) maxActual = Math.max(maxActual, actual);
     if (raw != null) { maxRaw = Math.max(maxRaw, raw); maxDmg = Math.max(maxDmg, dmg); if (!worst || row.leftPct < worst.leftPct) worst = row; }
   }
   const status = !worst ? 'none' : worst.left <= 0 ? 'bad' : worst.leftPct < 15 ? 'warn' : 'ok';
+  // 表に出す元ダメージ：防御力を計上する前の値に、当たったメンバーのうち防御力がいちばん低い人・高い人の防御力を掛けたもの
+  const base = ovr != null ? ovr : logMax;
+  let defLo = null, defHi = null;
+  for (const r of rows) {
+    if (r.raw == null) continue;
+    if (!defLo || r.defVal < defLo.defVal) defLo = r;
+    if (!defHi || r.defVal > defHi.defVal) defHi = r;
+  }
+  const defRange = base > 0 && defLo ? {base, lo:{m:defLo.m, def:defLo.defVal, dmg:Math.floor(base * defLo.defMul)},
+    hi:{m:defHi.m, def:defHi.defVal, dmg:Math.floor(base * defHi.defMul)}} : null;
   // 表の「有効な軽減」には軽減率のあるものだけ出す（回復だけのスキルは除く）
   const shown = act.filter(e => { const d = defOf(e); return (d.p || d.m) && (e.target === 'all' || hitIds.has(e.target)); });
-  return {c, key, type, rows, worst, maxRaw, maxDmg, maxActual, status, shown, ovr, logMax, targets:c.targets.length,
+  return {c, key, type, rows, worst, maxRaw, maxDmg, maxActual, status, shown, ovr, logMax, defRange, targets:c.targets.length,
     hasTank:c.targets.some(x => (fight.playerMap.get(x.pid) || {}).role === 'tank')};
 }
 
@@ -66,11 +79,15 @@ function visibleCasts(evals){
   });
 }
 
-// 古い形式のプラン（対象がログのプレイヤーID、使う人なし）を今のメンバーに合わせる
+// 古い形式のプラン（対象がログのプレイヤーID、使う人なし）と、ログの軽減から作ったプラン（使う人・対象がログのプレイヤーID）を今のメンバーに合わせる
 function fixEntry(e){
   if (typeof e.target === 'number') {
     const m = activeMembers().find(x => x.pid === e.target) || members.find(x => x.pid === e.target);
     e.target = m ? m.id : 'all';
+  }
+  if (typeof e.caster === 'number') {
+    const m = activeMembers().find(x => x.pid === e.caster) || members.find(x => x.pid === e.caster);
+    e.caster = m ? m.id : null;
   }
   if (e.custom) return;
   const d = MIT[e.mitId];

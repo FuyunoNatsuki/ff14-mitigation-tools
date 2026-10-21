@@ -7,8 +7,18 @@ const memberById = id => members.find(m => m.id === id) || null;
 const isActiveId = id => activeMembers().some(m => m.id === id);
 const jobOf = m => JOB_DATA[m && m.job] || null;
 const roleOf = m => (jobOf(m) || {}).role || 'melee';
-// 装備だけの値（手入力があればそれ、なければジョブの装備プリセット）
-const baseStatOf = (m, k) => (m && m[k] > 0) ? m[k] : ((jobOf(m) || {})[k] || 0);
+// 種族（空ならララフェル（デューンフォーク）など、data/modifiers.js の標準の種族）
+const clanOf = m => CLAN[m && m.race] || CLAN[DEFAULT_CLAN] || null;
+// 装備プリセットの能力値（STR・DEX・VIT・INT・MND）：「ジョブの基礎値＋装備」に種族の補正を足し、パーティボーナスを掛ける
+function presetAttr(m, k){
+  const j = jobOf(m) || {};
+  const base = j.attrs && j.attrs[k];
+  if (!(base > 0)) return j[k] || 0;
+  const c = clanOf(m);
+  return Math.floor((base + (c ? c.mod[ATTR_KEYS.indexOf(k)] : 0)) * (100 + (LV.partyBonus || 0)) / 100);
+}
+// 装備だけの値（手入力があればそれ、なければジョブの装備プリセット）。能力値の手入力はゲーム内の値（種族の補正込み）
+const baseStatOf = (m, k) => (m && m[k] > 0) ? m[k] : ATTR_KEYS.includes(k) ? presetAttr(m, k) : ((jobOf(m) || {})[k] || 0);
 // メンバーの食事：'none' は食事なし、空ならジョブの装備プリセットの食事
 function foodOf(m){
   if (!m || m.food === 'none') return null;
@@ -22,17 +32,25 @@ function foodBonus(m, k){
 }
 // 計算に使う値（装備＋食事）
 const statOf = (m, k) => baseStatOf(m, k) + (FOOD_STATS.has(k) ? foodBonus(m, k) : 0);
-// 食事の VIT で増える HP（VIT 1 あたりの HP は data/job-data.js の MP_LEVEL.hpPerVit）
-function foodHp(m){ return Math.floor(foodBonus(m, 'vit') * ((LV.hpPerVit || {})[roleOf(m) === 'tank' ? 'tank' : 'other'] || 0)); }
+// VIT 1 あたりの最大HP（data/job-data.js の MP_LEVEL.hpPerVit）
+const hpPerVitOf = m => (LV.hpPerVit || {})[roleOf(m) === 'tank' ? 'tank' : 'other'] || 0;
+// VIT から出す最大HP（Lv100）：⌊Lv の HP × ジョブのHP補正 ÷ 100⌋ + ⌊(VIT − main) × hpPerVit⌋。出せなければ 0
+function hpFromVit(m, vit){
+  const jm = JOB_MODS[m && m.job];
+  if (!jm || !(LV.hp > 0) || !(vit > 0)) return 0;
+  return Math.floor(LV.hp * jm.hp / 100) + Math.floor((vit - LV.main) * hpPerVitOf(m));
+}
+// 食事の VIT で増える HP
+function foodHp(m){ return Math.floor(foodBonus(m, 'vit') * hpPerVitOf(m)); }
 function logPlayer(m){ return fight && m && m.pid >= 0 ? fight.playerMap.get(m.pid) || null : null; }
 // 食事なしの最大HP（ログのHPはその戦闘で食べていた食事込みなので、そのまま使う）
-function defaultHp(m){ const lp = logPlayer(m); return (lp && lp.maxHP) || (jobOf(m) || {}).hp || FALLBACK_HP[roleGroup(roleOf(m))]; }
-// 計算に使う最大HP：手入力か装備の HP に食事の分を足す。ログの HP はそのまま
+function defaultHp(m){ const lp = logPlayer(m); return (lp && lp.maxHP) || hpFromVit(m, statOf(m, 'vit')) || (jobOf(m) || {}).hp || FALLBACK_HP[roleGroup(roleOf(m))]; }
+// 計算に使う最大HP：手入力の HP には食事の分を足す。ログの HP はそのまま。それ以外は食事込みの VIT から出す
 function hpOf(m){
   if (m.hp > 0) return m.hp + foodHp(m);
   const lp = logPlayer(m);
   if (lp && lp.maxHP) return lp.maxHP;
-  return defaultHp(m) + foodHp(m);
+  return hpFromVit(m, statOf(m, 'vit') + foodBonus(m, 'vit')) || defaultHp(m) + foodHp(m);
 }
 function memberName(m){ if (!m) return '?'; const lp = logPlayer(m); return m.name || (lp && lp.name) || (jobOf(m) || {}).ja || m.job; }
 // 不屈による被ダメージ倍率（Lv100）
@@ -41,17 +59,17 @@ function tenMul(m){
   const ten = Math.max(statOf(m, 'ten'), TEN_SUB);
   return (1000 - Math.floor(200 * (ten - TEN_SUB) / TEN_DIV)) / 1000;
 }
-// 物理防御力・魔法防御力による被ダメージ倍率（Lv100）。特殊ダメージには使わない。値が0（未入力）なら掛けない
-function defMul(m, type){
-  if (!settings.def || type === 'unique') return 1;
-  const v = statOf(m, type === 'phys' ? 'def' : 'mdef');
-  if (!(v > 0)) return 1;
-  return 1 - Math.floor(15 * v / TEN_DIV) / 100;
-}
+// 物理防御力・魔法防御力による被ダメージ倍率（Lv100）：(100 − ⌊15 × 防御力 ÷ 2780⌋) ÷ 100。特殊ダメージには使わない
+function defMulOf(v, type){ return type === 'unique' || !(v > 0) ? 1 : (100 - Math.floor(15 * v / TEN_DIV)) / 100; }
+const defValueOf = (m, type) => type === 'phys' ? statOf(m, 'def') : type === 'mag' ? statOf(m, 'mdef') : 0;
+const defMul = (m, type) => defMulOf(defValueOf(m, type), type);
+// ログのプレイヤーの防御力による倍率（そのジョブの装備プリセットの防御力）。ログの元ダメージから防御力の分を戻すのに使う
+function logDefMul(p, type){ const j = JOB_DATA[JOB_FROM_LOG[p && p.job]] || {}; return defMulOf(type === 'phys' ? j.def : type === 'mag' ? j.mdef : 0, type); }
 function normMember(id, x, fb){
   x = x && typeof x === 'object' ? x : {};
   const o = {id, job:JOB_DATA[x.job] && JOB_ORDER.includes(x.job) ? x.job : fb.job, name:String(x.name || '').slice(0, 20), pid:Number.isInteger(+x.pid) ? +x.pid : fb.pid,
-    food:typeof x.food === 'string' && (x.food === 'none' || FOOD[x.food]) ? x.food : (fb.food || '')};
+    food:typeof x.food === 'string' && (x.food === 'none' || FOOD[x.food]) ? x.food : (fb.food || ''),
+    race:typeof x.race === 'string' && CLAN[x.race] ? x.race : (fb.race || '')};
   for (const k of STAT_KEYS) o[k] = clampNum(x[k], 0, 9999999, 0);
   return o;
 }
@@ -60,7 +78,7 @@ function defaultMembers(f){
   const ps = f ? [...f.players].sort((a, b) => (ROLE_ORDER[jobRoleOfLog(a)] - ROLE_ORDER[jobRoleOfLog(b)]) || a.id - b.id) : [];
   return SLOT_IDS.map((id, i) => {
     const p = ps[i];
-    const o = {id, job:p ? (JOB_FROM_LOG[p.job] || DEFAULT_COMP[i]) : DEFAULT_COMP[i], name:'', pid:p ? p.id : -1, food:''};
+    const o = {id, job:p ? (JOB_FROM_LOG[p.job] || DEFAULT_COMP[i]) : DEFAULT_COMP[i], name:'', pid:p ? p.id : -1, food:'', race:''};
     for (const k of STAT_KEYS) o[k] = 0;
     return o;
   });

@@ -275,9 +275,10 @@ details.add-cast{margin-bottom:12px;border:1px dashed var(--line);border-radius:
 details.add-cast summary{cursor:pointer;font-weight:700;font-size:.84rem;color:var(--accent)}
 
 /* ===== 食事（メンバー表）===== */
-.mtable .c-food select{min-width:180px}
+.mtable .c-food select{min-width:180px} .mtable .c-race select{min-width:12em}
+.def-range{font-size:.72rem;line-height:1.35;margin-top:3px;white-space:nowrap}
 .food-gain{margin-top:2px;white-space:normal;max-width:220px}
-@media (max-width:640px){ .mtable td.c-food{grid-column:1 / -1} .mtable .c-food select{min-width:0} .food-gain{max-width:none} }
+@media (max-width:640px){ .mtable td.c-food,.mtable td.c-race{grid-column:1 / -1} .mtable .c-food select,.mtable .c-race select{min-width:0} .food-gain{max-width:none} }
 
 /* ===== TL がないあいだは、読み込み・共有だけを出す ===== */
 body.no-fight section.fold:not([data-fold="load"]){display:none}

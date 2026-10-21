@@ -14,13 +14,15 @@
 <script src="data/gear.js"></script>
 <script src="data/mitigations.js"></script>
 <script src="data/heals.js"></script>
+<script src="data/modifiers.js"></script>
+<script src="data/action-ids.js"></script>
 <script src="data/icons.js"></script>
 </head>
 <body>
 <div class="wrap" id="app">
   <header>
     <h1><small>FINAL FANTASY XIV 軽減プランナー</small>Mitigation Planner</h1>
-    <div class="formula">予測被ダメ = 元ダメージ × Π(1−軽減) × 不屈 × 防御力</div>
+    <div class="formula">予測被ダメ = 元ダメージ（防御力を計上する前）× Π(1−軽減) × 不屈 × 防御力</div>
   </header>
 
   <section class="card fold" data-fold="load">
@@ -42,6 +44,8 @@
           <input type="text" id="url" placeholder="https://ja.fflogs.com/reports/AbCdEf123456#fight=5"></label>
         <label class="f fight-sel" for="fight" style="width:260px">戦闘
           <select id="fight" disabled><option>URLを読み込むと選べます</option></select></label>
+        <label class="f" for="mitSource" style="width:230px">読み込むときの軽減
+          <select id="mitSource"><option value="plan">今のプランの軽減を使う</option><option value="log">ログで実際に使われた軽減にする</option></select></label>
         <button class="btn" id="load" type="button">読み込む</button>
       </div>
       <div class="row" id="loginRow" hidden style="margin-top:10px;align-items:center">
@@ -133,10 +137,10 @@
     </div>
     <div class="fold-body">
     <div class="tbl-wrap"><table class="mtable">
-      <thead><tr><th>#</th><th>ジョブ</th><th>名前</th><th>ログのプレイヤー</th><th>食事</th><th class="num">最大HP</th><th class="num">クリ</th><th class="num">意思</th><th class="num">不屈</th><th class="num">信仰</th><th class="num">SS</th><th class="num">物理防御</th><th class="num">魔法防御</th><th class="num">精神</th><th class="num">武器(魔)</th><th class="num">回復係数</th></tr></thead>
+      <thead><tr><th>#</th><th>ジョブ</th><th>名前</th><th>ログのプレイヤー</th><th>食事</th><th>種族</th><th class="num">最大HP</th><th class="num">VIT</th><th class="num">クリ</th><th class="num">意思</th><th class="num">不屈</th><th class="num">信仰</th><th class="num">SS</th><th class="num">物理防御</th><th class="num">魔法防御</th><th class="num">精神</th><th class="num">武器(魔)</th><th class="num">回復係数</th></tr></thead>
       <tbody id="mbody"></tbody>
     </table></div>
-    <p class="note">空欄の項目は、ジョブごとの装備プリセット（Patch7.55 最終装備、<code>data/gear.js</code>）の値を使います。表のステータスは食事を含まない装備だけの値で、「食事」で選んだ食事の分が計算のときに足されます（空欄なら装備プリセットで使っている食事）。最大HPはログにHPがあればログの値（その戦闘の食事込み）をそのまま使い、手入力や標準値のときは食事の VIT の分を足します。被ダメージの計算に使うのは最大HP・不屈・物理防御・魔法防御です。回復量は、精神と武器(魔)（武器の魔法性能）が入っていれば回復計算式（意思・クリ・SS・不屈も使う）で、入っていなければ回復係数で簡易に計算します。信仰は記録用です。物理防御・魔法防御は「防御力の軽減を入れる」をオンにしたときだけ、入力のあるメンバーに掛かります。</p>
+    <p class="note">空欄の項目は、ジョブごとの装備プリセット（Patch7.55 最終装備、<code>data/gear.js</code>）の値を使います。表のステータスは食事を含まない装備だけの値で、「食事」で選んだ食事の分が計算のときに足されます（空欄なら装備プリセットで使っている食事）。VIT・精神の標準値は、装備プリセットの値に「種族」の補正を足し、パーティボーナス（+5%）を掛けたものです（種族は空欄ならララフェル（デューンフォーク））。VIT・精神を手入力するときは、ゲーム内の値（種族の補正込み）を入れてください。最大HPはログにHPがあればログの値（その戦闘の食事込み）をそのまま使い、なければ食事込みの VIT から計算します（手入力の最大HPには食事の VIT の分を足します）。物理防御・魔法防御の標準値は、装備プリセットの各部位の値を etro.gg から取って足したものです。被ダメージの計算に使うのは最大HP・不屈・物理防御・魔法防御です。回復量は、精神と武器(魔)（武器の魔法性能）が入っていれば回復計算式（意思・クリ・SS・不屈も使う）で、入っていなければ回復係数で簡易に計算します。信仰は記録用です。</p>
     </div>
   </section>
 
@@ -178,7 +182,6 @@
       <span class="insert-at" id="insertAt"></span>
       <div class="row" style="gap:10px;align-items:center">
         <label class="toggle" for="ten"><input type="checkbox" id="ten"> 不屈の被ダメ軽減を入れる</label>
-        <label class="toggle" for="defOn" title="元ダメージが防御力を引く前の値のときにオンにします"><input type="checkbox" id="defOn"> 防御力の軽減を入れる</label>
         <label class="toggle" for="trait"><input type="checkbox" id="trait"> タンク特性(−20%)を追加で掛ける</label>
         <label class="f" for="zoom" style="flex-direction:row;align-items:center;gap:6px">拡大
           <select id="zoom" style="width:auto"><option value="4">小</option><option value="8" selected>中</option><option value="14">大</option></select></label>
@@ -220,14 +223,14 @@
       <p class="note">追加した攻撃は表の行にある「削除」で消せます。ログから読み込んだ攻撃は消せません。</p>
     </details>
     <div class="tbl-wrap"><table class="pred">
-      <thead><tr><th>時刻</th><th>攻撃</th><th>種別</th><th class="num">人数</th><th class="num">元ダメ（上書き可）</th><th>有効な軽減</th><th class="num">予測被ダメ(最大)</th><th class="num">最小残りHP</th><th>判定</th></tr></thead>
+      <thead><tr><th>時刻</th><th>攻撃</th><th>種別</th><th class="num">人数</th><th class="num">元ダメ（防御前・上書き可）</th><th>有効な軽減</th><th class="num">予測被ダメ(最大)</th><th class="num">最小残りHP</th><th>判定</th></tr></thead>
       <tbody id="tbody"></tbody>
     </table></div>
     <p class="note">元ダメージはログの「軽減前ダメージ」です。欄に数値を入れると、その攻撃の元ダメージ（1人あたり）として、ログの値より優先して使います（ルームでは全員に共有されます）。空にするとログの値に戻ります。バリアで吸収されたヒットはサンプルから除外し、同じ攻撃で当たった他のメンバーの値（中央値）で補います（<span class="est">推定</span>表示）。</p>
     </div>
   </section>
 
-  <footer>軽減率と効果時間はパッチ7.x（黄金のレガシー）時点の値です。被ダメージの±5%程度のブレと、回復・HP減少中の状態は計算に入れていません。不屈と防御力の軽減はLv100の計算式（不屈は420を基準、防御力は 15×防御力÷2780 %）です。FF Logs の元ダメージに防御力の分がすでに含まれていると思われる場合は「防御力の軽減を入れる」をオフのままにしてください。FF Logs の元ダメージにタンク特性の20%が含まれていないと感じたら「タンク特性を追加で掛ける」をオンにしてください。行を開くと実際のダメージと比べられます。<br>スキル・ジョブのアイコン: Copyright (C) SQUARE ENIX CO., LTD. All Rights Reserved.</footer>
+  <footer>軽減率と効果時間はパッチ7.x（黄金のレガシー）時点の値です。被ダメージの±5%程度のブレと、回復・HP減少中の状態は計算に入れていません。不屈と防御力の軽減はLv100の計算式（不屈は420を基準、防御力は 15×防御力÷2780 %）です。元ダメージは防御力を計上する前の値として扱います。FF Logs の元ダメージは、受けた人の防御力の分が引かれた値とみなし、その人のジョブの装備プリセットの防御力で割り戻しています。FF Logs の元ダメージにタンク特性の20%が含まれていないと感じたら「タンク特性を追加で掛ける」をオンにしてください。行を開くと実際のダメージと比べられます。<br>スキル・ジョブのアイコン: Copyright (C) SQUARE ENIX CO., LTD. All Rights Reserved.</footer>
 </div>
 
 <script src="js/constants.js"></script>

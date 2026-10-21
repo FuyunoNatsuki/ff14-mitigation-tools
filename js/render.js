@@ -68,7 +68,7 @@ function renderMembers(){
   const players = fight ? fight.players : [];
   body.innerHTML = members.map((m, i) => {
     const j = jobOf(m) || {};
-    const ph = k => k === 'hp' ? defaultHp(m) : (j[k] || '');
+    const ph = k => k === 'hp' ? defaultHp(m) : ATTR_KEYS.includes(k) ? (presetAttr(m, k) || '') : (j[k] || '');
     const num = k => `<td class="num c-stat" data-label="${STAT_LABEL[k]}"><input type="number" min="0" step="${k === 'hp' ? 1000 : 1}" data-mstat="${k}" data-mid="${m.id}" value="${m[k] > 0 ? m[k] : ''}" placeholder="${esc(ph(k))}" aria-label="${esc(memberName(m))} ${k}" ${readOnly ? 'disabled' : ''}></td>`;
     return `<tr class="${i < partySize ? '' : 'inactive'}">
       <td class="slot c-slot">${i + 1}</td>
@@ -76,6 +76,7 @@ function renderMembers(){
       <td class="c-name" data-label="名前"><input type="text" class="nm" maxlength="20" data-mname="${m.id}" value="${esc(m.name)}" placeholder="${esc((logPlayer(m) || {}).name || j.ja || '')}" aria-label="${i + 1}人目の名前" ${readOnly ? 'disabled' : ''}></td>
       <td class="c-pid" data-label="ログのプレイヤー"><select data-mpid="${m.id}" aria-label="${i + 1}人目に対応するログのプレイヤー" ${readOnly ? 'disabled' : ''}><option value="-1">なし（全体攻撃のみ）</option>${players.map(p => `<option value="${p.id}"${p.id === m.pid ? ' selected' : ''}>${esc(p.name)}</option>`).join('')}</select></td>
       <td class="c-food" data-label="食事">${foodSelect(m, i)}</td>
+      <td class="c-race" data-label="種族">${raceSelect(m, i)}</td>
       ${STAT_KEYS.map(num).join('')}</tr>`;
   }).join('');
 }
@@ -183,32 +184,43 @@ function renderTable(vis){
       const caster = memberById(e.caster), tgt = e.target === 'all' ? null : memberById(e.target);
       const tip = `${d.name} ${r}%${caster ? '（' + memberName(caster) + '）' : ''}${tgt && d.kind === 'single' ? ' → ' + memberName(tgt) : ''}`;
       return iconHtml({...d, name:tip}, kindOf(e), 'sm' + (r ? '' : ' off')); }).join('') || '<span class="sub">なし</span>';
-    const est = ev.rows.some(r => r.estimated) ? ' <span class="est">推定</span>' : '';
+    const est = ev.rows.some(r => r.estimated) ? ` <span class="est"${c.from != null ? ` title="バリアで元ダメージが取れなかったため、同じ敵の同じ攻撃（${fmtT(c.from / 1000)}）の値を使っています"` : ''}>推定</span>` : '';
     let out = `<tr class="cast-row${selCast === c.id ? ' sel' : ''}" data-row="${c.id}">
       <td class="time c-time">${fmtT(c.t / 1000)}</td>
       <td class="c-name"><span class="aname">${esc(c.name)}</span>${est}${c.manual ? ` <span class="manual">手入力</span> <button type="button" class="btn danger small" data-delcast="${c.id}" ${readOnly ? 'disabled' : ''}>削除</button>` : ''}<div class="sub">${c.nHits}ヒット${c.nExcl ? ` / バリア除外 ${c.nExcl}` : ''}</div></td>
       <td class="c-type"><select class="type-sel ${ev.type}" data-type="${esc(c.abilityId)}" aria-label="ダメージ種別" ${readOnly ? 'disabled' : ''}>${Object.entries(TYPE_LABEL).map(([k, v]) => `<option value="${k}"${k === ev.type ? ' selected' : ''}>${v}</option>`).join('')}</select></td>
       <td class="num c-n">${ev.targets}</td>
-      <td class="num c-raw" data-label="元ダメ"><input type="number" class="ovr${ev.ovr ? ' set' : ''}" min="0" step="1000" data-ovr="${esc(ev.key)}" value="${ev.ovr || ''}" placeholder="${ev.logMax ? Math.round(ev.logMax) : '—'}" aria-label="${esc(c.name)} の元ダメージ" ${readOnly ? 'disabled' : ''}>${ev.ovr ? '<div class="manual">手入力</div>' : ''}</td>
+      <td class="num c-raw" data-label="元ダメ"><input type="number" class="ovr${ev.ovr ? ' set' : ''}" min="0" step="1000" data-ovr="${esc(ev.key)}" value="${ev.ovr || ''}" placeholder="${ev.logMax ? Math.round(ev.logMax) : '—'}" aria-label="${esc(c.name)} の元ダメージ（防御力を計上する前）" ${readOnly ? 'disabled' : ''}>${ev.ovr ? '<div class="manual">手入力</div>' : ''}${defRangeHtml(ev)}</td>
       <td class="c-mits"><div class="mits">${mits}</div></td>
       <td class="num c-dmg" data-label="予測被ダメ">${ev.status === 'none' ? '—' : fmt(ev.maxDmg)}</td>
       <td class="num c-left" data-label="最小残りHP">${w ?(w.left <= 0 ? '<span style="color:var(--bad)">0</span>' : fmt(w.left) + `<div class="sub">${esc(memberName(w.m))} ${w.leftPct.toFixed(0)}%</div>`) : '—'}</td>
       <td class="c-pill">${pill}</td></tr>`;
     if (openRows.has(c.id)) {
-      out += `<tr class="detail"><td colspan="9"><div class="tbl-wrap"><table class="ptable"><thead><tr><th>メンバー</th><th class="num">最大HP</th><th class="num">被弾前HP</th><th class="num">バリア</th><th class="num">元ダメ</th><th class="num">軽減</th><th class="num">予測被ダメ</th><th class="num">残りHP</th><th class="num">ログ上の実ダメ</th></tr></thead><tbody>` +
+      out += `<tr class="detail"><td colspan="9"><div class="tbl-wrap"><table class="ptable"><thead><tr><th>メンバー</th><th class="num">最大HP</th><th class="num">被弾前HP</th><th class="num">バリア</th><th class="num">元ダメ（防御前）</th><th class="num">${ev.type === 'mag' ? '魔法防御' : '物理防御'}</th><th class="num">防御後</th><th class="num">軽減</th><th class="num">予測被ダメ</th><th class="num">残りHP</th><th class="num">ログ上の実ダメ</th></tr></thead><tbody>` +
         ev.rows.map(r => `<tr><td><div class="row" style="gap:6px;align-items:center;flex-wrap:nowrap">${jobBadge(r.m)}${esc(memberName(r.m))} <span class="sub">${r.nHits > 1 ? '×' + r.nHits : ''}</span>${r.estimated ? ' <span class="est">推定</span>' : ''}${ev.ovr ? ' <span class="manual">手入力</span>' : ''}</div></td>
           <td class="num">${fmt(r.hp)}</td>
           <td class="num">${r.hpBefore != null ? (r.wasDead ? '<span style="color:var(--bad)">戦闘不能</span>' : fmt(r.hpBefore)) : '—'}</td>
           <td class="num">${r.shieldBefore ? fmt(r.shieldBefore) : '—'}</td>
           <td class="num">${r.raw == null ? '除外' : fmt(r.raw)}</td>
-          <td class="num">${((1 - r.mul) * 100).toFixed(1)}%</td>
+          <td class="num">${ev.type === 'unique' ? '—' : `${fmt(r.defVal)}<div class="sub">−${Math.round((1 - r.defMul) * 100)}%</div>`}</td>
+          <td class="num">${r.afterDef == null ? '—' : fmt(r.afterDef)}</td>
+          <td class="num">${((1 - r.mit) * 100).toFixed(1)}%</td>
           <td class="num">${r.dmg == null ? '—' : fmt(r.dmg)}</td>
           <td class="num" style="color:${r.left == null ? 'inherit' : r.left <= 0 ? 'var(--bad)' : r.leftPct < 15 ? 'var(--warn)' : 'inherit'}">${r.left == null ? '—' : r.left <= 0 ? '0' : fmt(r.left)}</td>
           <td class="num sub">${r.actual == null ? '—' : fmt(r.actual)}</td></tr>`).join('') +
-        `</tbody></table></div><p class="note">「ログ上の実ダメ」は実際の戦闘で受けたダメージ（バリア吸収分を含む）です。ログに対応するプレイヤーがいないメンバーは、全体攻撃のときだけ中央値で計算します。</p></td></tr>`;
+        `</tbody></table></div><p class="note">元ダメ（防御前）は防御力を計上する前の値で、ログの元ダメージを、受けた人のジョブの装備プリセットの防御力で割り戻したものです。防御後はそこにメンバーの防御力を掛けた値、軽減は軽減スキル・タンク特性・不屈の分、予測被ダメは両方を掛けた値です。「ログ上の実ダメ」は実際の戦闘で受けたダメージ（バリア吸収分を含む）です。ログに対応するプレイヤーがいないメンバーは、全体攻撃のときだけ中央値で計算します。${c.from != null ? ` この攻撃はバリアで全員の元ダメージが取れなかったため、同じ敵の同じ攻撃（${fmtT(c.from / 1000)}）の値を使っています。` : ''}</p></td></tr>`;
     }
     return out;
   }).join('');
+}
+
+// 元ダメの欄の下に出す、防御力を計上したあとの元ダメージ（防御力がいちばん低い人・高い人の2つ）
+function defRangeHtml(ev){
+  const r = ev.defRange;
+  if (!r || ev.type === 'unique') return '';
+  const label = ev.type === 'mag' ? '魔防' : '物防';
+  const who = x => `${memberName(x.m)}（${label}${fmt(x.def)}）`;
+  return `<div class="sub def-range" title="防御力を計上したあとの元ダメージ。${esc(label)}最小: ${esc(who(r.lo))} / 最大: ${esc(who(r.hi))}">${label}最小 ${fmt(r.lo.dmg)}<br>${label}最大 ${fmt(r.hi.dmg)}</div>`;
 }
 
 function insertTime(){ if (!fight || selCast == null) return 0; return Math.max(0, Math.round((fight.casts[selCast].t / 1000 - 8) * 10) / 10); }
@@ -366,6 +378,15 @@ function renderJobFilter(){
 
 // ===== 食事の選択（メンバー表）=====
 // 空：ジョブの装備プリセットの食事、none：食事なし。下に食事で上がる量を出す
+// 種族の選択（メンバー表）。下に STR・DEX・VIT・INT・MND の補正を出す
+function raceSelect(m, i){
+  const cur = CLAN[m.race] ? m.race : DEFAULT_CLAN;
+  const c = clanOf(m);
+  const sign = v => (v > 0 ? '+' : '') + v;
+  const sub = c ? ['STR', 'DEX', 'VIT', 'INT', 'MND'].map((l, k) => l + sign(c.mod[k])).join(' ') : '';
+  return `<select data-mrace="${m.id}" aria-label="${i + 1}人目の種族" ${readOnly ? 'disabled' : ''}>${CLANS.map(x => `<option value="${x.id}"${x.id === cur ? ' selected' : ''}>${esc(x.ja)}</option>`).join('')}</select>
+    <div class="sub food-gain">${esc(sub)}</div>`;
+}
 function foodSelect(m, i){
   const preset = FOOD[(jobOf(m) || {}).food];
   const opts = [['', `装備の食事（${preset ? preset.name : 'なし'}）`], ['none', '食事なし'], ...FOODS.map(f => [f.id, `${f.name}（IL${f.ilvl}）`])];
