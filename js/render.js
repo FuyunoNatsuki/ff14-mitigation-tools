@@ -92,16 +92,27 @@ function renderPalette(){
   $('palette').innerHTML = rows.join('');
 }
 
-function clashSet(){
-  // 同じ人が同じ軽減をリキャスト内に置いたもの（チャージ数を超えたもの）
-  const s = new Set(), groups = {};
+// 同じ人が同じスキルを使ったときのリキャストを、チャージ数の分だけ管理する。
+// チャージは1つずつ順番に回復する（回復中のチャージが戻ると、次のチャージの回復が始まる）。
+// 戻り値: clash = チャージが残っていないのに置いたもの、until = そのとき使ったチャージが戻る時刻、left = 使ったあとの残りチャージ
+function recastState(){
+  const clash = new Set(), until = new Map(), left = new Map(), groups = {};
   for (const e of plan) { if (e.custom || !entryLive(e)) continue; (groups[e.caster + '|' + e.mitId] ||= []).push(e); }
   for (const list of Object.values(groups)) {
     list.sort((a, b) => a.t - b.t);
-    const def = MIT[list[0].mitId], ch = def.charges || 1;
-    for (let i = ch; i < list.length; i++) if (list[i].t - list[i - ch].t < def.r) s.add(list[i].uid);
+    const def = MIT[list[0].mitId], max = def.charges || 1, r = def.r || 0;
+    let ch = max, next = null; // next: 回復中のチャージが戻る時刻
+    for (const e of list) {
+      while (next != null && next <= e.t + 1e-6) { ch++; next = ch < max ? next + r : null; }
+      if (ch <= 0) { clash.add(e.uid); until.set(e.uid, next); left.set(e.uid, 0); continue; }
+      ch--;
+      if (next == null) next = e.t + r;
+      // いま使ったチャージは、回復待ちの列のいちばん後ろで戻る
+      until.set(e.uid, next + (max - ch - 1) * r);
+      left.set(e.uid, ch);
+    }
   }
-  return s;
+  return {clash, until, left};
 }
 
 function renderTimeline(vis){
@@ -110,7 +121,8 @@ function renderTimeline(vis){
   const [vs, ve] = viewRange();
   const durS = ve - vs;
   const W = Math.ceil((durS + 10) * pps);
-  const clash = clashSet();
+  const rs = recastState(), clash = rs.clash;
+  const readyAt = (e, d) => rs.until.has(e.uid) ? rs.until.get(e.uid) : e.t + (d.r || 0);
   const visSet = new Set(vis.map(v => v.c.id));
   const others = peerSelections();
   const slotIndex = id => SLOT_IDS.indexOf(id);
@@ -125,15 +137,16 @@ function renderTimeline(vis){
       title="${fmtT(ev.c.t / 1000)} ${esc(ev.c.name)}（${TYPE_LABEL[ev.type]}）\n元ダメ最大 ${fmt(ev.maxRaw)} → 予測 ${fmt(ev.maxDmg)}" aria-label="${fmtT(ev.c.t / 1000)} ${esc(ev.c.name)}">${dots}</button>`; }).join('') + '</div>';
 
   // フェーズの前から続いている効果・リキャストは、左端で切って表示する（引き継ぎ）
-  const inView = (e, d) => e.t <= ve && e.t + Math.max(d.d || 0, d.r || 0) >= vs;
+  const inView = (e, d) => e.t <= ve && Math.max(e.t + (d.d || 0), readyAt(e, d)) >= vs;
   const barHtml = (e, d, k) => {
     const who = e.by && profileCache[e.by] && profileCache[e.by].name ? `\n配置: ${profileCache[e.by].name}` : '';
     const x0 = e.t - vs, left = Math.max(x0, 0), clipped = x0 < 0;
-    const recW = d.r ? x0 + d.r - left : 0;
+    // リキャストの線：このとき使ったチャージが戻るまで（チャージが複数あるスキルは、回復待ちの順番の分だけ長くなる）
+    const recW = d.r ? readyAt(e, d) - vs - left : 0;
     const rec = recW > 0 ? `<div class="rbar ${k}" style="left:${left * pps}px;width:${recW * pps}px"></div>` : '';
     const effW = x0 + d.d - left;
     if (effW <= 0) return rec;
-    const tip = `${esc(d.name)} ${fmtT(e.t)}〜${fmtT(e.t + d.d)}${d.r ? ' / リキャスト' + d.r + '秒' : ''}${clash.has(e.uid) ? '（リキャスト中）' : ''}${clipped ? '（前のフェーズから継続）' : ''}${esc(who)}`;
+    const tip = `${esc(d.name)} ${fmtT(e.t)}〜${fmtT(e.t + d.d)}${d.r ? ' / リキャスト' + d.r + '秒' : ''}${(d.charges || 1) > 1 ? ` / チャージ${d.charges}（使ったあと残り${rs.left.get(e.uid) ?? 0}、${fmtT(readyAt(e, d))}に1つ戻る）` : ''}${clash.has(e.uid) ? ((d.charges || 1) > 1 ? '（チャージが残っていない）' : '（リキャスト中）') : ''}${clipped ? '（前のフェーズから継続）' : ''}${esc(who)}`;
     return rec + `<button type="button" class="mbar ${k}${selEntry === e.uid ? ' sel' : ''}${clash.has(e.uid) ? ' clash' : ''}${clipped ? ' clipped' : ''}" data-entry="${esc(e.uid)}" style="left:${left * pps}px;width:${Math.max(effW * pps, clipped ? 4 : 22)}px" title="${tip}">${iconHtml(d, k)}<span class="bname">${esc(d.name)}</span></button>`;
   };
   // メンバーごとに、ジョブの軽減の並び順で行を固定する（時刻で並び替えない）
@@ -378,14 +391,16 @@ function renderJobFilter(){
 
 // ===== 食事の選択（メンバー表）=====
 // 空：ジョブの装備プリセットの食事、none：食事なし。下に食事で上がる量を出す
-// 種族の選択（メンバー表）。下に STR・DEX・VIT・INT・MND の補正を出す
+// 種族の選択（メンバー表）。下に、そのジョブと種族の装備なしの STR・DEX・VIT・INT・MND を出す
 function raceSelect(m, i){
   const cur = CLAN[m.race] ? m.race : DEFAULT_CLAN;
   const c = clanOf(m);
   const sign = v => (v > 0 ? '+' : '') + v;
-  const sub = c ? ['STR', 'DEX', 'VIT', 'INT', 'MND'].map((l, k) => l + sign(c.mod[k])).join(' ') : '';
-  return `<select data-mrace="${m.id}" aria-label="${i + 1}人目の種族" ${readOnly ? 'disabled' : ''}>${CLANS.map(x => `<option value="${x.id}"${x.id === cur ? ' selected' : ''}>${esc(x.ja)}</option>`).join('')}</select>
-    <div class="sub food-gain">${esc(sub)}</div>`;
+  const labels = ['STR', 'DEX', 'VIT', 'INT', 'MND'];
+  const mods = c ? '種族の補正: ' + labels.map((l, k) => l + sign(c.mod[k])).join(' ') : '';
+  const naked = JOB_MODS[m.job] ? '装備なし: ' + labels.map((l, k) => `${l} ${nakedAttr(m, ATTR_KEYS[k])}`).join(' / ') : '';
+  return `<select data-mrace="${m.id}" aria-label="${i + 1}人目の種族" title="${esc(mods)}" ${readOnly ? 'disabled' : ''}>${CLANS.map(x => `<option value="${x.id}"${x.id === cur ? ' selected' : ''}>${esc(x.ja)}</option>`).join('')}</select>
+    <div class="sub food-gain" title="${esc(mods)}">${esc(naked)}</div>`;
 }
 function foodSelect(m, i){
   const preset = FOOD[(jobOf(m) || {}).food];
@@ -394,7 +409,7 @@ function foodSelect(m, i){
   const f = foodOf(m);
   const label = {crit:'クリ', det:'意思', dh:'DH', ss:'SS', ten:'不屈', pie:'信仰', vit:'VIT'};
   const gains = f ? f.params.map(p => { const v = foodBonus(m, p.stat); return v ? `${label[p.stat]}+${v}` : ''; }).filter(Boolean) : [];
-  const hp = foodHp(m), fromLog = !(m.hp > 0) && logPlayer(m) && logPlayer(m).maxHP;
+  const hp = foodHp(m), fromLog = !(m.hp > 0) && !(m.vit > 0) && logPlayer(m) && logPlayer(m).maxHP;
   const sub = f ? gains.join(' ') + (hp ? ` / HP+${fmt(hp)}${fromLog ? '（ログのHPには足さない）' : ''}` : '') : '食事による上昇なし';
   return `<select data-mfood="${m.id}" aria-label="${i + 1}人目の食事" ${readOnly ? 'disabled' : ''}>${opts.map(([v, l]) => `<option value="${v}"${v === cur ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select>
     <div class="sub food-gain">${esc(sub)}</div>`;

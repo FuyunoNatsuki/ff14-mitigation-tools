@@ -7,7 +7,7 @@ const MITS = [
   {id:'reprisal',  abbr:'リプ', name:'リプライザル',             p:10,m:10,d:15,r:60, kind:'party', jobs:TANKS},
   {id:'rampart',   abbr:'ラン', name:'ランパート',               p:20,m:20,d:20,r:90, kind:'self',  jobs:TANKS},
   {id:'poa',       abbr:'パセ', name:'パッセージ・オブ・アームズ', p:15,m:15,d:18,r:120,kind:'party', jobs:['PLD']},
-  {id:'guardian',  abbr:'ガデ', name:'ガーディアン',             p:40,m:40,d:15,r:120,kind:'self',  jobs:['PLD']},
+  {id:'guardian',  abbr:'ガデ', name:'エクストリームガード',     p:40,m:40,d:15,r:120,kind:'self',  jobs:['PLD']},
   {id:'hsheltron', abbr:'シェ', name:'ホーリーシェルトロン',     p:15,m:15,d:8, r:5,  kind:'self',  jobs:['PLD']},
   {id:'intervention',abbr:'イン',name:'インターベンション',      p:10,m:10,d:8, r:10, kind:'single',jobs:['PLD']},
   {id:'damnation', abbr:'ダム', name:'ダムネーション',           p:40,m:40,d:15,r:120,kind:'self',  jobs:['WAR']},

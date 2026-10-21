@@ -9,13 +9,19 @@ const jobOf = m => JOB_DATA[m && m.job] || null;
 const roleOf = m => (jobOf(m) || {}).role || 'melee';
 // 種族（空ならララフェル（デューンフォーク）など、data/modifiers.js の標準の種族）
 const clanOf = m => CLAN[m && m.race] || CLAN[DEFAULT_CLAN] || null;
-// 装備プリセットの能力値（STR・DEX・VIT・INT・MND）：「ジョブの基礎値＋装備」に種族の補正を足し、パーティボーナスを掛ける
+// 装備なしの能力値（STR・DEX・VIT・INT・MND）：ジョブの基礎値 ⌊main × ジョブ補正 ÷ 100⌋ に種族の補正を足したもの
+// （例：デューンフォークのガンブレイカーは STR 439 / DEX 419 / VIT 482 / INT 266 / MND 443）
+function nakedAttr(m, k){
+  const jm = JOB_MODS[m && m.job], c = clanOf(m);
+  if (!jm) return 0;
+  return Math.floor(LV.main * jm[k] / 100) + (c ? c.mod[ATTR_KEYS.indexOf(k)] : 0);
+}
+// 装備プリセットの能力値：（装備なしの値＋装備）にパーティボーナスを掛ける
 function presetAttr(m, k){
   const j = jobOf(m) || {};
-  const base = j.attrs && j.attrs[k];
-  if (!(base > 0)) return j[k] || 0;
-  const c = clanOf(m);
-  return Math.floor((base + (c ? c.mod[ATTR_KEYS.indexOf(k)] : 0)) * (100 + (LV.partyBonus || 0)) / 100);
+  const gear = j.gearAttrs && j.gearAttrs[k];
+  if (gear == null || !JOB_MODS[m && m.job]) return j[k] || 0;
+  return Math.floor((nakedAttr(m, k) + gear) * (100 + (LV.partyBonus || 0)) / 100);
 }
 // 装備だけの値（手入力があればそれ、なければジョブの装備プリセット）。能力値の手入力はゲーム内の値（種族の補正込み）
 const baseStatOf = (m, k) => (m && m[k] > 0) ? m[k] : ATTR_KEYS.includes(k) ? presetAttr(m, k) : ((jobOf(m) || {})[k] || 0);
@@ -43,11 +49,16 @@ function hpFromVit(m, vit){
 // 食事の VIT で増える HP
 function foodHp(m){ return Math.floor(foodBonus(m, 'vit') * hpPerVitOf(m)); }
 function logPlayer(m){ return fight && m && m.pid >= 0 ? fight.playerMap.get(m.pid) || null : null; }
-// 食事なしの最大HP（ログのHPはその戦闘で食べていた食事込みなので、そのまま使う）
-function defaultHp(m){ const lp = logPlayer(m); return (lp && lp.maxHP) || hpFromVit(m, statOf(m, 'vit')) || (jobOf(m) || {}).hp || FALLBACK_HP[roleGroup(roleOf(m))]; }
-// 計算に使う最大HP：手入力の HP には食事の分を足す。ログの HP はそのまま。それ以外は食事込みの VIT から出す
+// 食事なしの最大HP（VIT を手入力していればその VIT から。ログのHPはその戦闘で食べていた食事込みなので、そのまま使う）
+function defaultHp(m){
+  const lp = logPlayer(m);
+  return (m.vit > 0 && hpFromVit(m, m.vit)) || (lp && lp.maxHP) || hpFromVit(m, statOf(m, 'vit')) || (jobOf(m) || {}).hp || FALLBACK_HP[roleGroup(roleOf(m))];
+}
+// 計算に使う最大HP：手入力の HP には食事の分を足す。VIT を手入力していれば、ログの HP より優先して食事込みの VIT から出す。
+// ログの HP はそのまま。それ以外は食事込みの VIT から出す
 function hpOf(m){
   if (m.hp > 0) return m.hp + foodHp(m);
+  if (m.vit > 0) { const v = hpFromVit(m, m.vit + foodBonus(m, 'vit')); if (v) return v; }
   const lp = logPlayer(m);
   if (lp && lp.maxHP) return lp.maxHP;
   return hpFromVit(m, statOf(m, 'vit') + foodBonus(m, 'vit')) || defaultHp(m) + foodHp(m);

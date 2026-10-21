@@ -16,14 +16,14 @@
 //            下回らなければ効果時間の終わりに回復する（深謀遠慮の策・シャドウヴィジル・ハート・オブ・コランダム）
 const HEALS = [
   // ----- 白魔道士 -----
-  {id:'medica3',  abbr:'メ3', name:'メディカラ',               jobs:['WHM'], kind:'party',  d:15, r:2.5, heal:250, hot:{pot:175, dur:15}},
+  {id:'medica3',  abbr:'メ3', name:'メディガ',                 jobs:['WHM'], kind:'party',  d:15, r:2.5, heal:250, hot:{pot:175, dur:15}},
   {id:'cure3',    abbr:'ケガ', name:'ケアルガ',                 jobs:['WHM'], kind:'party',  d:3,  r:2.5, heal:600},
   {id:'rapture',  abbr:'ラプ', name:'ハート・オブ・ラプチャー', jobs:['WHM'], kind:'party',  d:3,  r:2.5, heal:400},
   {id:'assize',   abbr:'アサ', name:'アサイズ',                 jobs:['WHM'], kind:'party',  d:3,  r:40,  heal:400},
   {id:'asylum',   abbr:'アサ', name:'アサイラム',               jobs:['WHM'], kind:'party',  d:24, r:90,  hot:{pot:100, dur:24}},
-  {id:'tetra',    abbr:'テト', name:'テトラグラマトン',         jobs:['WHM'], kind:'single', d:3,  r:60,  heal:700},
+  {id:'tetra',    abbr:'テト', name:'テトラグラマトン',         jobs:['WHM'], kind:'single', d:3,  r:60,  heal:700, charges:2},
   {id:'regen',    abbr:'リジ', name:'リジェネ',                 jobs:['WHM'], kind:'single', d:18, r:2.5, hot:{pot:250, dur:18}},
-  {id:'benison',  abbr:'ベニ', name:'ディヴァインベニゾン',     jobs:['WHM'], kind:'single', d:15, r:30,  shield:{pot:500}, shieldDur:15},
+  {id:'benison',  abbr:'ベニ', name:'ディヴァインベニゾン',     jobs:['WHM'], kind:'single', d:15, r:30,  shield:{pot:500}, shieldDur:15, charges:2},
   {id:'caress',   abbr:'カレ', name:'ディヴァインカレス',       jobs:['WHM'], kind:'party',  d:10, r:1,   shield:{pot:400}, shieldDur:10, hot:{pot:200, dur:10}},
   // ----- 学者 -----
   {id:'recit',    abbr:'秘策', name:'秘策',                     jobs:['SCH'], kind:'self',   d:15, r:60,  recit:true},
@@ -34,15 +34,15 @@ const HEALS = [
   {id:'lustrate', abbr:'活性', name:'生命活性法',               jobs:['SCH'], kind:'single', d:3,  r:1,   heal:600},
   {id:'whisper',  abbr:'囁き', name:'光の囁き',                 jobs:['SCH'], kind:'party',  d:21, r:60,  hot:{pot:80, dur:21}},
   {id:'blessing', abbr:'祝福', name:'フェイブレッシング',       jobs:['SCH'], kind:'party',  d:3,  r:60,  heal:320},
-  {id:'consol',   abbr:'コン', name:'コンソレイション',         jobs:['SCH'], kind:'party',  d:30, r:20,  heal:250, shield:{pot:250}, shieldDur:30},
+  {id:'consol',   abbr:'コン', name:'コンソレイション',         jobs:['SCH'], kind:'party',  d:30, r:30,  heal:250, shield:{pot:250}, shieldDur:30, charges:2},
   // ----- 占星術師 -----
   {id:'ns',       abbr:'NS',   name:'ニュートラルセクト',       jobs:['AST'], kind:'self',   d:20, r:120, healUp:0.2, buffDur:20},
   {id:'hconj',    abbr:'ヘコ', name:'コンジャンクション・ヘリオス', jobs:['AST'], kind:'party', d:15, r:2.5, heal:250, hot:{pot:175, dur:15}, ns:1.25},
   {id:'abenefic', abbr:'アベ', name:'アスペクト・ベネフィク',   jobs:['AST'], kind:'single', d:15, r:2.5, heal:250, hot:{pot:250, dur:15}, ns:2.5},
   {id:'helios',   abbr:'ヘリ', name:'ヘリオス',                 jobs:['AST'], kind:'party',  d:3,  r:2.5, heal:400},
   {id:'benefic2', abbr:'ベネ', name:'ベネフィラ',               jobs:['AST'], kind:'single', d:3,  r:2.5, heal:800},
-  {id:'essdig',   abbr:'星天', name:'星天開門',                 jobs:['AST'], kind:'single', d:3,  r:40,  heal:400},
-  {id:'intersect',abbr:'交差', name:'星天交差',                 jobs:['AST'], kind:'single', d:30, r:30,  heal:200, shield:{pot:400}, shieldDur:30},
+  {id:'essdig',   abbr:'星天', name:'星天開門',                 jobs:['AST'], kind:'single', d:3,  r:40,  heal:400, charges:3},
+  {id:'intersect',abbr:'交差', name:'星天交差',                 jobs:['AST'], kind:'single', d:30, r:30,  heal:200, shield:{pot:400}, shieldDur:30, charges:2},
   {id:'opposit',  abbr:'対抗', name:'星天対抗',                 jobs:['AST'], kind:'party',  d:15, r:60,  heal:200, hot:{pot:100, dur:15}},
   {id:'star',     abbr:'星',   name:'アーサリースター',         jobs:['AST'], kind:'party',  d:10, r:60,  heal:720, delay:10},
   // ----- 賢者 -----
@@ -68,6 +68,7 @@ const HEALS = [
 
 // 軽減タブにあるスキルのうち、回復・バリア・回復アップの効果も持つもの（軽減率は data/mitigations.js 側）
 const MIT_HEAL_EXTRAS = {
+  guardian:   {shield:{pot:1000}, shieldDur:15},
   temperance: {healUp:0.2, buffDur:20},
   soil:       {hot:{pot:100, dur:15}},
   cu:         {hot:{pot:100, dur:15}},

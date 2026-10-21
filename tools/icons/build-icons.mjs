@@ -28,26 +28,41 @@ const png = async iconPath => {
 const PICK = {
   essdig: 3614, // 星天開門（同じ名前の古い Action があるため）
 };
+// HoT・バリアの効果（Status）の名前がスキル名と違うもの（スキルの id → 効果の名前）
+const STATUS_ALIAS = {
+  adlo: ['鼓舞', '激励'], concit: ['鼓舞'], consol: ['セラフィックヴェール'], caress: ['ディヴァインカレス［バリア］', 'ディヴァインカレス［回］'],
+  eprog: ['エウクラシア・プログノシス'],
+};
 
 // スキルの一覧を data/ のファイルから読む
 const ctx = {window:{}};
 vm.createContext(ctx);
 for (const f of ['data/mitigations.js', 'data/heals.js']) vm.runInContext(fs.readFileSync(path.join(root, f), 'utf8'), ctx);
-const skills = vm.runInContext('[...MITS, ...HEALS]', ctx);
+const skills = vm.runInContext('[...MITS.map(m => ({...m, ...(MIT_HEAL_EXTRAS[m.id] || {})})), ...HEALS]', ctx);
 
-const actions = {}, picked = {}, actionIds = {};
+const actions = {}, picked = {}, actionIds = {}, statusIds = {};
 for (const s of skills) {
-  // FF Logs のログでスキルを見分けるためのゲーム内ID（同じ名前のプレイヤーのスキル。PvP 用などを含む）
-  const all = await get('search', {sheets:'Action', query:`Name="${s.name}"`, language:'ja', fields:'IsPlayerAction', limit:'50'});
-  actionIds[s.id] = [...new Set([PICK[s.id], ...all.results.filter(x => x.fields.IsPlayerAction).map(x => x.row_id)].filter(Boolean))].sort((a, b) => a - b);
+  // FF Logs のログでスキルを見分けるためのゲーム内ID（同じ名前のプレイヤーのスキル。PvP 用は除く）
+  const all = await get('search', {sheets:'Action', query:`Name="${s.name}"`, language:'ja', fields:'IsPlayerAction,IsPvP', limit:'50'});
+  actionIds[s.id] = [...new Set([PICK[s.id], ...all.results.filter(x => x.fields.IsPlayerAction && !x.fields.IsPvP).map(x => x.row_id)].filter(Boolean))].sort((a, b) => a - b);
+  // HoT・バリアの効果のゲーム内ID（ログの HoT の回復量・バリア量を見分ける）
+  if (s.hot || s.shield) {
+    const ids = [];
+    for (const n of [s.name, ...(STATUS_ALIAS[s.id] || [])]) {
+      const st = await get('search', {sheets:'Status', query:`Name="${n}"`, language:'ja', fields:'Name', limit:'20'});
+      ids.push(...st.results.map(x => x.row_id));
+    }
+    statusIds[s.id] = [...new Set(ids)].sort((a, b) => a - b);
+    if (!ids.length) console.warn(`効果が見つからない: ${s.id} ${s.name}`);
+  }
   let row;
   if (PICK[s.id]) {
     row = (await get(`sheet/Action/${PICK[s.id]}`, {language:'ja', fields:'Name,Icon'})).fields;
     row.row_id = PICK[s.id];
   } else {
     const r = await get('search', {sheets:'Action', query:`Name="${s.name}"`, language:'ja',
-      fields:'Name,Icon,IsPlayerAction,ClassJobLevel,ClassJob.Abbreviation', limit:'50'});
-    const cands = r.results.map(x => ({...x.fields, row_id:x.row_id, job:x.fields.ClassJob.fields && x.fields.ClassJob.fields.Abbreviation}));
+      fields:'Name,Icon,IsPlayerAction,IsPvP,ClassJobLevel,ClassJob.Abbreviation', limit:'50'});
+    const cands = r.results.filter(x => !x.fields.IsPvP).map(x => ({...x.fields, row_id:x.row_id, job:x.fields.ClassJob.fields && x.fields.ClassJob.fields.Abbreviation}));
     // プレイヤーのスキル > そのジョブのスキル > 番号の小さいもの
     const score = c => (c.IsPlayerAction ? 4 : 0) + (s.jobs.includes(c.job) ? 2 : 0) + (c.ClassJobLevel > 0 ? 1 : 0);
     cands.sort((a, b) => score(b) - score(a) || a.row_id - b.row_id);
@@ -85,6 +100,10 @@ fs.writeFileSync(path.join(root, 'data/action-ids.js'), `'use strict';
 // スキルのゲーム内ID（FF Logs のログで使われたスキルを見分けるのに使う）。tools/icons/build-icons.mjs で作ったファイルです
 window.MP_ACTION_IDS = {
 ${Object.entries(actionIds).map(([k, v]) => `  ${JSON.stringify(k)}: ${JSON.stringify(v)},`).join('\n')}
+};
+// HoT・バリアの効果（Status）のゲーム内ID。FF Logs では 1000000 を足した番号で出る
+window.MP_STATUS_IDS = {
+${Object.entries(statusIds).map(([k, v]) => `  ${JSON.stringify(k)}: ${JSON.stringify(v)},`).join('\n')}
 };
 `);
 console.log(`data/icons.js: スキル ${Object.keys(actions).length} / ${skills.length}、ジョブ ${Object.keys(jobs).length}、${Math.round(out.length / 1024)}KB`);

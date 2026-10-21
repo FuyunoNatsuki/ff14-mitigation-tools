@@ -13,7 +13,7 @@ const ROLE_FALLBACK = {PLD:'tank',WAR:'tank',DRK:'tank',GNB:'tank',WHM:'healer',
 for (const j of JOB_ORDER) if (!JOB_DATA[j]) JOB_DATA[j] = {ja:j, abbr:j[0], role:ROLE_FALLBACK[j], hp:0, crit:0, det:0, ten:420, pie:0, ss:0};
 // 装備プリセット（data/gear.js）の値を、ジョブの標準ステータスにする（食事の分は含まない）
 const GEAR = (typeof window.MP_GEAR === 'object' && window.MP_GEAR) || {};
-for (const j of JOB_ORDER) { const g = GEAR[j]; if (g && g.stats) Object.assign(JOB_DATA[j], g.stats, {food:g.food, gearName:g.name, attrs:g.attrs || null}); }
+for (const j of JOB_ORDER) { const g = GEAR[j]; if (g && g.stats) Object.assign(JOB_DATA[j], g.stats, {food:g.food, gearName:g.name, gearAttrs:g.gearAttrs || null}); }
 // 種族とジョブの補正（data/modifiers.js）。能力値は STR・DEX・VIT・INT・MND の順
 const ATTR_KEYS = ['str', 'dex', 'vit', 'int', 'mnd'];
 const CLANS = Array.isArray(window.MP_CLANS) ? window.MP_CLANS : [];
@@ -21,6 +21,9 @@ const CLAN = Object.fromEntries(CLANS.map(c => [c.id, c]));
 const DEFAULT_CLAN = CLAN[window.MP_DEFAULT_CLAN] ? window.MP_DEFAULT_CLAN : ((CLANS[0] || {}).id || '');
 const JOB_MODS = (window.MP_JOB_MODS && typeof window.MP_JOB_MODS === 'object') ? window.MP_JOB_MODS : {};
 // スキルのゲーム内ID（data/action-ids.js）から、スキルの id を引く（ログで使われたスキルを見分ける）
+// スキルの id → ゲーム内ID の一覧、HoT・バリアの効果（Status）のゲーム内ID の一覧（FF Logs では 1000000 を足した番号）
+const SKILL_GAME_IDS = (window.MP_ACTION_IDS && typeof window.MP_ACTION_IDS === 'object') ? window.MP_ACTION_IDS : {};
+const SKILL_STATUS_IDS = (window.MP_STATUS_IDS && typeof window.MP_STATUS_IDS === 'object') ? window.MP_STATUS_IDS : {};
 const SKILL_BY_GAME_ID = new Map();
 for (const [id, list] of Object.entries(window.MP_ACTION_IDS || {})) if (Array.isArray(list)) for (const g of list) SKILL_BY_GAME_ID.set(g, id);
 // 食事（data/foods.js）

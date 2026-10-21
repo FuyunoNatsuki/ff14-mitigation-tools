@@ -4,8 +4,9 @@
 // - 装備：tools/gear/gear-source.json（https://fuucdayo.com/battle/8759/ の各ジョブの最初の装備パターン。
 //         サイトの数値は食事込み）から、食事の分を除いた「装備だけ」の値を出す。武器の性能は XIVAPI から取る
 // - 能力値（STR・DEX・VIT・INT・MND）：サイトの装備ページ（gearset/<url>/）の最初の装備パターンの各部位を XIVAPI で引き、
-//         ジョブの基礎値（⌊440 × ジョブ補正 ÷ 100⌋）と足した「種族の補正とパーティボーナスを含まない値」を出す。
-//         サイトの数値は、これにパーティボーナス（+5%）を掛けたもの（種族の補正なし）と一致することを確かめる
+//         装備だけの合計を出す（ジョブの基礎値と種族の補正はツール側で足す）。
+//         サイトの数値が ⌊(ジョブの基礎値 ⌊440 × ジョブ補正 ÷ 100⌋ ＋ 装備) × 1.05⌋（パーティボーナス、種族の補正なし）と
+//         一致することを確かめる
 // - 物理防御・魔法防御：各部位の値を etro.gg（https://etro.gg/api/equipment/<アイテムID>/）から取って足す
 // 装備を更新するときは gear-source.json の stats（サイトのステータス欄の数値）・food・weapon を書き換えて実行してください。
 import fs from 'node:fs';
@@ -89,7 +90,7 @@ for (const [job, g] of Object.entries(source)) {
   if (!wf) throw new Error(`${job}: 武器「${g.weapon}」が見つかりません`);
   // 能力値と防御力を各部位から足す
   const mods = JOB_MODS[job];
-  const attrs = Object.fromEntries(Object.values(ATTR).map(k => [k, Math.floor(LV_MAIN * mods[k] / 100)]));
+  const attrs = Object.fromEntries(Object.values(ATTR).map(k => [k, 0]));
   let def = 0, mdef = 0;
   const items = await gearItems(g.url);
   if (!items.length) throw new Error(`${job}: 装備ページから部位を読めません`);
@@ -102,12 +103,12 @@ for (const [job, g] of Object.entries(source)) {
   for (const [label, k] of Object.entries(ATTR)) {
     const site = k === 'vit' ? st.vit : g.stats[label];
     if (site == null) continue;
-    const calc = Math.floor(attrs[k] * (100 + PARTY_BONUS) / 100);
+    const calc = Math.floor((Math.floor(LV_MAIN * mods[k] / 100) + attrs[k]) * (100 + PARTY_BONUS) / 100);
     if (calc !== site) console.warn(`${job}: ${label} がサイトの値と合いません（計算 ${calc} / サイト ${site}）`);
   }
   gear[job] = {name:`Patch7.55 最終装備（${g.pattern}）`, source:`https://fuucdayo.com/gearset/${g.url}/`, weapon:g.weapon, ilvl:wf.LevelItem.value,
     food:f.id, items:items.map(it => itemCache.get(it.name).id),
-    attrs, stats:{crit:st.crit, det:st.det, dh:st.dh, ss:st.ss, ten:st.ten || 420, pie:st.pie || 440, def, mdef,
+    gearAttrs:attrs, stats:{crit:st.crit, det:st.det, dh:st.dh, ss:st.ss, ten:st.ten || 420, pie:st.pie || 440, def, mdef,
       wd:wf.DamageMag, wdPhys:wf.DamagePhys}};
   console.log(`${job}: VIT ${attrs.vit} / MND ${attrs.mnd} / 物理防御 ${def} / 魔法防御 ${mdef}`);
 }
@@ -126,7 +127,7 @@ fs.writeFileSync(path.join(root, 'data/gear.js'), `'use strict';
 // ジョブごとの装備プリセット（メンバーのステータスが空欄のときの標準値）。
 // https://fuucdayo.com/battle/8759/ の「Patch7.55 最終装備」の各ジョブの最初の装備パターンから作りました。
 // サイトの数値は食事込みなので、ここでは食事の分を除いた「装備だけ」の値にしています（食事は food で選ぶ）。
-// attrs は STR・DEX・VIT・INT・MND の「ジョブの基礎値＋装備」（種族の補正とパーティボーナス +5% を含まない）。
+// gearAttrs は STR・DEX・VIT・INT・MND の装備だけの合計（ジョブの基礎値・種族の補正・パーティボーナス +5% は含まない）。
 // def / mdef は物理防御・魔法防御（各部位の値を etro.gg から取って足したもの）。items は装備のアイテムID。
 // food は data/foods.js の id（サイトで使っている食事）。wd は武器の魔法性能（回復量の計算に使う）、wdPhys は物理性能。
 // ten / pie は、その装備で上がっていなければ基準値（不屈 420、信仰 440）。

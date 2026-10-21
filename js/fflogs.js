@@ -155,9 +155,37 @@ function planFromCasts(events, f, actors){
     const tgt = e.targetID > 0 ? owner(e.targetID) : -1;
     const tgtIsPlayer = (actors.get(tgt) || {}).type === 'Player';
     out.push({mitId:id, t:Math.max(0, Math.round((e.timestamp - f.startTime) / 100) / 10), caster,
-      target:d.kind === 'party' ? 'all' : d.kind === 'single' && tgtIsPlayer ? tgt : caster});
+      target:d.kind === 'party' ? 'all' : d.kind === 'single' && tgtIsPlayer ? tgt : caster, at:e.timestamp});
   }
   return out;
+}
+
+// ログで使われたヒール・バリアに、ログ上の回復量・HoT の1回分・バリア量（1人あたりの平均）を入れる（e.ovr。手入力と同じ扱い）。
+// 回復量はオーバーヒールを含む量（あふれた分も含めた、スキルが出した回復量）。
+//   回復：使ってから 2.5秒以内（遅れて効くスキルはその分あと）の、そのスキルの回復
+//   HoT ：効果時間の間の、そのスキルの効果（Status）の回復
+//   バリア：使ってから 2.5秒以内に付いた、そのスキルの効果のバリア量（ログにバリア量が記録されているときだけ）
+// ログに見つからなかったものは、これまでどおり計算式で出す
+function healOverridesFromLog(entries, heals, buffs, actors){
+  const owner = id => { const a = actors.get(id); return a && a.petOwner > 0 ? a.petOwner : id; };
+  const amount = h => (h.amount || 0) + (h.overheal || 0);
+  const avg = list => list.length ? Math.round(list.reduce((a, b) => a + b, 0) / list.length) : 0;
+  let n = 0;
+  for (const e of entries) {
+    const d = MIT[e.mitId];
+    if (!(d.heal || d.hot || d.shield)) continue;
+    const ids = new Set(SKILL_GAME_IDS[e.mitId] || []);
+    const st = new Set((SKILL_STATUS_IDS[e.mitId] || []).map(x => x + 1000000));
+    const from = ev => owner(ev.sourceID) === e.caster;
+    const t0 = e.at + (d.delay || 0) * 1000;
+    const ovr = {};
+    if (d.heal) ovr.heal = avg(heals.filter(h => !h.tick && ids.has(h.abilityGameID) && from(h) && h.timestamp >= e.at && h.timestamp <= t0 + 2500).map(amount));
+    if (d.hot) ovr.hot = avg(heals.filter(h => h.tick && (st.has(h.abilityGameID) || ids.has(h.abilityGameID)) && from(h) && h.timestamp > e.at && h.timestamp <= t0 + d.hot.dur * 1000 + 3000).map(amount));
+    if (d.shield) ovr.shield = avg(buffs.filter(b => (b.type === 'applybuff' || b.type === 'refreshbuff') && st.has(b.abilityGameID) && from(b) && b.absorb > 0 && b.timestamp >= e.at && b.timestamp <= t0 + 2500).map(b => b.absorb));
+    for (const k of Object.keys(ovr)) if (!(ovr[k] > 0)) delete ovr[k];
+    if (Object.keys(ovr).length) { e.ovr = ovr; n++; }
+  }
+  return n;
 }
 
 async function loadFight(fid){
@@ -173,7 +201,9 @@ async function loadFight(fid){
   let planList = null, note = '';
   if (fromLog) {
     planList = planFromCasts(await fetchEvents(r, f, 'Casts', 'スキルの使用'), f, actors);
-    note = `ログで使われた軽減・回復 ${planList.length} 件を配置しました。`;
+    // ヒール・バリアの量もログのものを使う
+    const healN = healOverridesFromLog(planList, await fetchEvents(r, f, 'Healing', '回復'), await fetchEvents(r, f, 'Buffs', 'バフ'), actors);
+    note = `ログで使われた軽減・回復 ${planList.length} 件を配置し、そのうち ${healN} 件の回復量・HoT・バリア量をログの値にしました。`;
   } else if (fight) {
     planList = plan.map(cleanEntry);
     note = `今のプランの軽減 ${planList.length} 件をそのまま使います。`;
