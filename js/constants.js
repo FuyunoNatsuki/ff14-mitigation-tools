@@ -3,7 +3,10 @@
 
 // ===== ジョブ（data/job-data.js から。読めなかったときの最低限の値）=====
 const JOB_DATA = (window.MP_JOB_DATA && typeof window.MP_JOB_DATA === 'object') ? window.MP_JOB_DATA : {};
-const ACTION_ICONS = (window.MP_ACTION_ICONS && typeof window.MP_ACTION_ICONS === 'object') ? window.MP_ACTION_ICONS : {};
+// スキルとジョブのアイコン：公式のもの（data/icons.js）に、data/job-data.js の MP_ACTION_ICONS の差し替えを重ねる
+const OFFICIAL_ICONS = (window.MP_OFFICIAL_ICONS && typeof window.MP_OFFICIAL_ICONS === 'object') ? window.MP_OFFICIAL_ICONS : {};
+const ACTION_ICONS = {...OFFICIAL_ICONS.actions, ...((window.MP_ACTION_ICONS && typeof window.MP_ACTION_ICONS === 'object') ? window.MP_ACTION_ICONS : {})};
+const JOB_ICONS = OFFICIAL_ICONS.jobs || {};
 const JOB_ORDER = ['PLD','WAR','DRK','GNB','WHM','SCH','AST','SGE','MNK','DRG','NIN','SAM','RPR','VPR','BRD','MCH','DNC','BLM','SMN','RDM','PCT'];
 const ROLE_FALLBACK = {PLD:'tank',WAR:'tank',DRK:'tank',GNB:'tank',WHM:'healer',SCH:'healer',AST:'healer',SGE:'healer',
   MNK:'melee',DRG:'melee',NIN:'melee',SAM:'melee',RPR:'melee',VPR:'melee',BRD:'ranged',MCH:'ranged',DNC:'ranged',BLM:'caster',SMN:'caster',RDM:'caster',PCT:'caster'};

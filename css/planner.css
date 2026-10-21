@@ -78,6 +78,7 @@ details.cred .row{margin-top:10px}
 /* ジョブバッジと軽減アイコン */
 .jb{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:5px;color:#fff;font-size:.72rem;font-weight:700;flex:none;line-height:1}
 .jb.tank{background:var(--r-tank)} .jb.healer{background:var(--r-healer)} .jb.melee{background:var(--r-melee)} .jb.ranged{background:var(--r-ranged)} .jb.caster{background:var(--r-caster)} .jb.none{background:var(--muted)}
+.jb.img{background:none} .jb img{width:100%;height:100%;display:block}
 .ico{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:6px;color:#fff;font-size:.6rem;font-weight:700;letter-spacing:-.04em;flex:none;line-height:1;
   box-shadow:inset 0 0 0 1px rgba(255,255,255,.25),inset 0 -6px 8px rgba(0,0,0,.18);overflow:hidden;white-space:nowrap}
 .ico.party{background:var(--lane-party)} .ico.self{background:var(--lane-self)} .ico.single{background:var(--lane-single)} .ico.custom{background:var(--lane-custom)}

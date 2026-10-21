@@ -43,9 +43,9 @@ window.MP_JOB_DATA = {
   PCT: {ja:'ピクトマンサー', abbr:'ピ', role:'caster', hp:176000, crit:3214, det:2210, ten:420, pie:440, ss:420, def:0, mdef:0, hpp:45, mnd:0, wd:0},
 };
 
-// 軽減アイコンの画像を差し替えたいときは、軽減のIDと画像URLを書きます（空ならツール独自のアイコン）。
+// スキルのアイコンは data/icons.js の公式アイコンを使います。別の画像に差し替えたいときは、スキルのIDと画像URLを書きます。
 // 例: reprisal: 'icons/reprisal.png',
-// 軽減のIDは data/mitigations.js の MITS を見てください。
+// スキルのIDは data/mitigations.js の MITS と data/heals.js の HEALS を見てください。
 window.MP_ACTION_ICONS = {
 };
 

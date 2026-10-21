@@ -25,7 +25,7 @@ const MITS = [
   {id:'soil',      abbr:'陣',   name:'野戦治療の陣',             p:10,m:10,d:15,r:30, kind:'party', jobs:['SCH']},
   {id:'illum',     abbr:'イル', name:'フェイイルミネーション',   p:0, m:5, d:20,r:120,kind:'party', jobs:['SCH']},
   {id:'cu',        abbr:'運命', name:'運命の輪',                 p:10,m:10,d:5, r:60, kind:'party', jobs:['AST']},
-  {id:'exalt',     abbr:'エク', name:'エクサルテーション',       p:10,m:10,d:8, r:60, kind:'single',jobs:['AST']},
+  {id:'exalt',     abbr:'エク', name:'エクザルテーション',       p:10,m:10,d:8, r:60, kind:'single',jobs:['AST']},
   {id:'kera',      abbr:'ケラ', name:'ケーラコレ',               p:10,m:10,d:15,r:30, kind:'party', jobs:['SGE']},
   {id:'holos',     abbr:'ホリ', name:'ホーリズム',               p:10,m:10,d:20,r:120,kind:'party', jobs:['SGE']},
   {id:'tauro',     abbr:'タウ', name:'タウロコレ',               p:10,m:10,d:15,r:45, kind:'single',jobs:['SGE']},
@@ -36,5 +36,5 @@ const MITS = [
   {id:'tact',      abbr:'タク', name:'タクティシャン',           p:15,m:15,d:15,r:90, kind:'party', jobs:['MCH']},
   {id:'samba',     abbr:'サン', name:'守りのサンバ',             p:15,m:15,d:15,r:90, kind:'party', jobs:['DNC']},
   {id:'addle',     abbr:'アド', name:'アドル',                   p:5, m:10,d:15,r:90, kind:'party', jobs:['BLM','SMN','RDM','PCT']},
-  {id:'barrier',   abbr:'バリ', name:'マジックバリア',           p:0, m:10,d:10,r:120,kind:'party', jobs:['RDM']},
+  {id:'barrier',   abbr:'バリ', name:'バマジク',           p:0, m:10,d:10,r:120,kind:'party', jobs:['RDM']},
 ];

@@ -7,7 +7,13 @@ function iconHtml(def, kind, cls = ''){
   const label = def.abbr || String(def.name || '').slice(0, 2);
   return `<span class="ico ${kind} ${cls}" title="${esc(def.name)}">${url ? `<img src="${esc(url)}" alt="">` : esc(label)}</span>`;
 }
-const jobBadge = m => { const j = jobOf(m); return `<span class="jb ${j ? j.role : 'none'}" title="${esc(j ? j.ja : '')}">${esc(j ? j.abbr : '?')}</span>`; };
+// ジョブのアイコン（公式のアイコンがなければ、役割の色に略称）
+function jobIconHtml(code){
+  const d = JOB_DATA[code], url = JOB_ICONS[code];
+  if (!d) return `<span class="jb none">?</span>`;
+  return `<span class="jb ${d.role}${url ? ' img' : ''}" title="${esc(d.ja)}">${url ? `<img src="${esc(url)}" alt="">` : esc(d.abbr)}</span>`;
+}
+const jobBadge = m => jobIconHtml(m && m.job);
 
 // ===== 描画 =====
 let EVALS = [], SIM = null;
@@ -355,7 +361,7 @@ function renderJobFilter(){
   box.innerHTML = `<span class="sub">ジョブで絞り込み（複数選ぶといずれか）</span>
     <button type="button" class="jf${fs.size ? '' : ' on'}" data-jobf="" aria-pressed="${!fs.size}">すべて</button>` +
     jobs.map(j => { const d = JOB_DATA[j]; const on = fs.has(j);
-      return `<button type="button" class="jf${on ? ' on' : ''}" data-jobf="${j}" aria-pressed="${on}"><span class="jb ${d.role}">${esc(d.abbr)}</span>${esc(d.ja)}</button>`; }).join('');
+      return `<button type="button" class="jf${on ? ' on' : ''}" data-jobf="${j}" aria-pressed="${on}">${jobIconHtml(j)}${esc(d.ja)}</button>`; }).join('');
 }
 
 // ===== 食事の選択（メンバー表）=====

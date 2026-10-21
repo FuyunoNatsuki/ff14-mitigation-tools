@@ -28,7 +28,7 @@ const HEALS = [
   // ----- 学者 -----
   {id:'recit',    abbr:'秘策', name:'秘策',                     jobs:['SCH'], kind:'self',   d:15, r:60,  recit:true},
   {id:'adlo',     abbr:'鼓舞', name:'鼓舞激励の策',             jobs:['SCH'], kind:'single', d:30, r:2.5, heal:300, shield:{pct:1.8}, shieldDur:30, recitable:true, catalyze:true},
-  {id:'concit',   abbr:'意気', name:'意気軒高の策',             jobs:['SCH'], kind:'party',  d:30, r:2.5, heal:200, shield:{pct:1.8}, shieldDur:30, recitable:true},
+  {id:'concit',   abbr:'意気', name:'意気軒昂の策',             jobs:['SCH'], kind:'party',  d:30, r:2.5, heal:200, shield:{pct:1.8}, shieldDur:30, recitable:true},
   {id:'indom',    abbr:'不撓', name:'不撓不屈の策',             jobs:['SCH'], kind:'party',  d:3,  r:30,  heal:400, recitable:true},
   {id:'excog',    abbr:'深謀', name:'深謀遠慮の策',             jobs:['SCH'], kind:'single', d:45, r:45,  trigger:{pot:800, under:0.5, dur:45}, recitable:true},
   {id:'lustrate', abbr:'活性', name:'生命活性法',               jobs:['SCH'], kind:'single', d:3,  r:1,   heal:600},
@@ -37,7 +37,7 @@ const HEALS = [
   {id:'consol',   abbr:'コン', name:'コンソレイション',         jobs:['SCH'], kind:'party',  d:30, r:20,  heal:250, shield:{pot:250}, shieldDur:30},
   // ----- 占星術師 -----
   {id:'ns',       abbr:'NS',   name:'ニュートラルセクト',       jobs:['AST'], kind:'self',   d:20, r:120, healUp:0.2, buffDur:20},
-  {id:'hconj',    abbr:'ヘコ', name:'ヘリオス・コンジャンクション', jobs:['AST'], kind:'party', d:15, r:2.5, heal:250, hot:{pot:175, dur:15}, ns:1.25},
+  {id:'hconj',    abbr:'ヘコ', name:'コンジャンクション・ヘリオス', jobs:['AST'], kind:'party', d:15, r:2.5, heal:250, hot:{pot:175, dur:15}, ns:1.25},
   {id:'abenefic', abbr:'アベ', name:'アスペクト・ベネフィク',   jobs:['AST'], kind:'single', d:15, r:2.5, heal:250, hot:{pot:250, dur:15}, ns:2.5},
   {id:'helios',   abbr:'ヘリ', name:'ヘリオス',                 jobs:['AST'], kind:'party',  d:3,  r:2.5, heal:400},
   {id:'benefic2', abbr:'ベネ', name:'ベネフィラ',               jobs:['AST'], kind:'single', d:3,  r:2.5, heal:800},
@@ -60,7 +60,7 @@ const HEALS = [
   {id:'dveil',    abbr:'ヴェ', name:'ディヴァインヴェール',     jobs:['PLD'], kind:'party',  d:30, r:90,  heal:400, shield:{hpPct:0.10, of:'caster'}, shieldDur:30},
   {id:'tbn',      abbr:'TBN', name:'ブラックナイト',            jobs:['DRK'], kind:'single', d:7,  r:15,  shield:{hpPct:0.25, of:'caster'}, shieldDur:7},
   // ----- DPS -----
-  {id:'waltz',    abbr:'ワル', name:'癒しのワルツ',             jobs:['DNC'], kind:'party',  d:3,  r:60,  heal:300},
+  {id:'waltz',    abbr:'ワル', name:'癒やしのワルツ',             jobs:['DNC'], kind:'party',  d:3,  r:60,  heal:300},
   {id:'minne',    abbr:'ミン', name:'地神のミンネ',             jobs:['BRD'], kind:'party',  d:15, r:120, recv:0.15, buffDur:15},
   {id:'mantra',   abbr:'マン', name:'マントラ',                 jobs:['MNK'], kind:'party',  d:15, r:90,  recv:0.1, buffDur:15},
   {id:'secondwind',abbr:'内丹', name:'内丹',                    jobs:['MNK','DRG','NIN','SAM','RPR','VPR','BRD','MCH','DNC'], kind:'self', d:3, r:120, heal:800},
