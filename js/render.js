@@ -152,7 +152,7 @@ function renderTimeline(vis){
   // メンバーごとに、ジョブの軽減の並び順で行を固定する（時刻で並び替えない）
   const fs = jobFilterSet();
   for (const m of activeMembers().filter(m => passesJobFilter(m, fs))) {
-    html += `<div class="lab member">${jobBadge(m)}<span class="lname">${esc(memberName(m))}</span>${hpLowLabel(m, vs, ve)}</div><div class="lane member" style="width:${W}px">${hpSvg(m, W, pps, vs, ve)}</div>`;
+    html += `<div class="lab member" title="最大HP ${fmt(hpOf(m))}（食事込み。食事なし ${fmt(defaultHp(m))} ＋ 食事 ${fmt(hpOf(m) - defaultHp(m))}）">${jobBadge(m)}<span class="lname">${esc(memberName(m))}</span>${hpLowLabel(m, vs, ve)}</div><div class="lane member" style="width:${W}px">${hpSvg(m, W, pps, vs, ve)}</div>`;
     const mine = plan.filter(e => !e.custom && e.caster === m.id && MIT[e.mitId].tab === settings.tab && inView(e, MIT[e.mitId]));
     const rows = new Map();
     for (const e of mine) { const rk = e.mitId + '|' + (MIT[e.mitId].kind === 'single' ? e.target : ''); (rows.get(rk) || rows.set(rk, []).get(rk)).push(e); }
@@ -209,7 +209,7 @@ function renderTable(vis){
       <td class="num c-left" data-label="最小残りHP">${w ?(w.left <= 0 ? '<span style="color:var(--bad)">0</span>' : fmt(w.left) + `<div class="sub">${esc(memberName(w.m))} ${w.leftPct.toFixed(0)}%</div>`) : '—'}</td>
       <td class="c-pill">${pill}</td></tr>`;
     if (openRows.has(c.id)) {
-      out += `<tr class="detail"><td colspan="9"><div class="tbl-wrap"><table class="ptable"><thead><tr><th>メンバー</th><th class="num">最大HP</th><th class="num">被弾前HP</th><th class="num">バリア</th><th class="num">元ダメ（防御前）</th><th class="num">${ev.type === 'mag' ? '魔法防御' : '物理防御'}</th><th class="num">防御後</th><th class="num">軽減</th><th class="num">予測被ダメ</th><th class="num">残りHP</th><th class="num">ログ上の実ダメ</th></tr></thead><tbody>` +
+      out += `<tr class="detail"><td colspan="9"><div class="tbl-wrap"><table class="ptable"><thead><tr><th>メンバー</th><th class="num">最大HP（食事込み）</th><th class="num">被弾前HP</th><th class="num">バリア</th><th class="num">元ダメ（防御前）</th><th class="num">${ev.type === 'mag' ? '魔法防御' : '物理防御'}</th><th class="num">防御後</th><th class="num">軽減</th><th class="num">予測被ダメ</th><th class="num">残りHP</th><th class="num">ログ上の実ダメ</th></tr></thead><tbody>` +
         ev.rows.map(r => `<tr><td><div class="row" style="gap:6px;align-items:center;flex-wrap:nowrap">${jobBadge(r.m)}${esc(memberName(r.m))} <span class="sub">${r.nHits > 1 ? '×' + r.nHits : ''}</span>${r.estimated ? ' <span class="est">推定</span>' : ''}${ev.ovr ? ' <span class="manual">手入力</span>' : ''}</div></td>
           <td class="num">${fmt(r.hp)}</td>
           <td class="num">${r.hpBefore != null ? (r.wasDead ? '<span style="color:var(--bad)">戦闘不能</span>' : fmt(r.hpBefore)) : '—'}</td>
@@ -409,8 +409,8 @@ function foodSelect(m, i){
   const f = foodOf(m);
   const label = {crit:'クリ', det:'意思', dh:'DH', ss:'SS', ten:'不屈', pie:'信仰', vit:'VIT'};
   const gains = f ? f.params.map(p => { const v = foodBonus(m, p.stat); return v ? `${label[p.stat]}+${v}` : ''; }).filter(Boolean) : [];
-  const hp = foodHp(m), fromLog = !(m.hp > 0) && !(m.vit > 0) && logPlayer(m) && logPlayer(m).maxHP;
-  const sub = f ? gains.join(' ') + (hp ? ` / HP+${fmt(hp)}${fromLog ? '（ログのHPには足さない）' : ''}` : '') : '食事による上昇なし';
+  const hp = foodHp(m);
+  const sub = (f ? gains.join(' ') + (hp ? ` / HP+${fmt(hp)}` : '') : '食事による上昇なし') + ` → 最大HP ${fmt(hpOf(m))}`;
   return `<select data-mfood="${m.id}" aria-label="${i + 1}人目の食事" ${readOnly ? 'disabled' : ''}>${opts.map(([v, l]) => `<option value="${v}"${v === cur ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select>
     <div class="sub food-gain">${esc(sub)}</div>`;
 }

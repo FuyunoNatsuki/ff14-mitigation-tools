@@ -30,9 +30,8 @@ function foodOf(m){
   if (!m || m.food === 'none') return null;
   return FOOD[m.food] || FOOD[(jobOf(m) || {}).food] || null;
 }
-// 食事で上がる量（素の値 × 割合、ただし上限まで）
-function foodBonus(m, k){
-  const f = foodOf(m);
+// 食事で上がる量（素の値 × 割合、ただし上限まで）。f を渡すとその食事で計算する
+function foodBonus(m, k, f = foodOf(m)){
   const p = f && f.params.find(x => x.stat === k);
   return p ? Math.min(Math.floor(baseStatOf(m, k) * p.pct / 100), p.max) : 0;
 }
@@ -46,21 +45,23 @@ function hpFromVit(m, vit){
   if (!jm || !(LV.hp > 0) || !(vit > 0)) return 0;
   return Math.floor(LV.hp * jm.hp / 100) + Math.floor((vit - LV.main) * hpPerVitOf(m));
 }
-// 食事の VIT で増える HP
-function foodHp(m){ return Math.floor(foodBonus(m, 'vit') * hpPerVitOf(m)); }
+// 食事の VIT で増える HP（f を渡すとその食事で計算する）
+function foodHp(m, f = foodOf(m)){ return Math.floor(foodBonus(m, 'vit', f) * hpPerVitOf(m)); }
 function logPlayer(m){ return fight && m && m.pid >= 0 ? fight.playerMap.get(m.pid) || null : null; }
-// 食事なしの最大HP（VIT を手入力していればその VIT から。ログのHPはその戦闘で食べていた食事込みなので、そのまま使う）
+// 食事なしの最大HP（メンバー表に出す値）。VIT を手入力していればその VIT から。
+// ログのHPは食事込みなので、そのジョブの装備プリセットの食事を食べていたものとして、その分を引く
 function defaultHp(m){
   const lp = logPlayer(m);
-  return (m.vit > 0 && hpFromVit(m, m.vit)) || (lp && lp.maxHP) || hpFromVit(m, statOf(m, 'vit')) || (jobOf(m) || {}).hp || FALLBACK_HP[roleGroup(roleOf(m))];
+  if (m.vit > 0) { const v = hpFromVit(m, m.vit); if (v) return v; }
+  if (lp && lp.maxHP) return lp.maxHP - foodHp(m, FOOD[(jobOf(m) || {}).food] || null);
+  return hpFromVit(m, statOf(m, 'vit')) || (jobOf(m) || {}).hp || FALLBACK_HP[roleGroup(roleOf(m))];
 }
-// 計算に使う最大HP：手入力の HP には食事の分を足す。VIT を手入力していれば、ログの HP より優先して食事込みの VIT から出す。
-// ログの HP はそのまま。それ以外は食事込みの VIT から出す
+// TL・計算に使う最大HP（食事込み）。手入力の HP・ログの HP は食事なしの値に、選んだ食事の VIT の分を足す。
+// VIT から出すときは、食事込みの VIT から出す
 function hpOf(m){
   if (m.hp > 0) return m.hp + foodHp(m);
-  if (m.vit > 0) { const v = hpFromVit(m, m.vit + foodBonus(m, 'vit')); if (v) return v; }
   const lp = logPlayer(m);
-  if (lp && lp.maxHP) return lp.maxHP;
+  if (!(m.vit > 0) && lp && lp.maxHP) return defaultHp(m) + foodHp(m);
   return hpFromVit(m, statOf(m, 'vit') + foodBonus(m, 'vit')) || defaultHp(m) + foodHp(m);
 }
 function memberName(m){ if (!m) return '?'; const lp = logPlayer(m); return m.name || (lp && lp.name) || (jobOf(m) || {}).ja || m.job; }
