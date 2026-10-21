@@ -82,6 +82,8 @@ document.addEventListener('change', ev => {
 });
 $('trait').addEventListener('change', e => { settings.trait = e.target.checked; saveSettings(); renderAll(); });
 $('ten').addEventListener('change', e => { settings.ten = e.target.checked; saveSettings(); renderAll(); });
+// パーティボーナス（+5%）：装備プリセットの STR・DEX・VIT・INT・MND に掛けるか
+$('partyBonus').addEventListener('change', e => { settings.partyBonus = e.target.checked; saveSettings(); renderAll(); });
 // ログを読み込むときの軽減（今のプランの軽減 / ログで実際に使われた軽減）
 $('mitSource').addEventListener('change', e => { settings.mitSource = e.target.value === 'log' ? 'log' : 'plan'; saveSettings(); });
 $('hpSim').addEventListener('change', e => { settings.hpSim = e.target.checked; saveSettings(); renderAll(); });

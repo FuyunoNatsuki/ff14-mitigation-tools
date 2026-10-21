@@ -16,12 +16,13 @@ function nakedAttr(m, k){
   if (!jm) return 0;
   return Math.floor(LV.main * jm[k] / 100) + (c ? c.mod[ATTR_KEYS.indexOf(k)] : 0);
 }
-// 装備プリセットの能力値：（装備なしの値＋装備）にパーティボーナスを掛ける
+// 装備プリセットの能力値：（装備なしの値＋装備）にパーティボーナスを掛ける（設定でオフにしたときは掛けない）
+const partyBonusPct = () => settings.partyBonus === false ? 0 : (LV.partyBonus || 0);
 function presetAttr(m, k){
   const j = jobOf(m) || {};
   const gear = j.gearAttrs && j.gearAttrs[k];
   if (gear == null || !JOB_MODS[m && m.job]) return j[k] || 0;
-  return Math.floor((nakedAttr(m, k) + gear) * (100 + (LV.partyBonus || 0)) / 100);
+  return Math.floor((nakedAttr(m, k) + gear) * (100 + partyBonusPct()) / 100);
 }
 // 装備だけの値（手入力があればそれ、なければジョブの装備プリセット）。能力値の手入力はゲーム内の値（種族の補正込み）
 const baseStatOf = (m, k) => (m && m[k] > 0) ? m[k] : ATTR_KEYS.includes(k) ? presetAttr(m, k) : ((jobOf(m) || {})[k] || 0);
