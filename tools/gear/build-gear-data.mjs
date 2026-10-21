@@ -1,14 +1,14 @@
 // data/foods.js と data/gear.js を作り直すスクリプト（Node.js 18 以上）。
 //   node tools/gear/build-gear-data.mjs
 // - 食事：XIVAPI（ゲームデータ）から、アイテムレベル690以上（パッチ7.x）の料理を取り、戦闘用のものだけ残す
-// - 装備：tools/gear/gear-source.json（https://fuucdayo.com/battle/8759/ の各ジョブの最初の装備パターン。
-//         サイトの数値は食事込み）から、食事の分を除いた「装備だけ」の値を出す。武器の性能は XIVAPI から取る
-// - 能力値（STR・DEX・VIT・INT・MND）：サイトの装備ページ（gearset/<url>/）の最初の装備パターンの各部位を XIVAPI で引き、
-//         装備だけの合計を出す（ジョブの基礎値と種族の補正はツール側で足す）。
-//         サイトの数値が ⌊(ジョブの基礎値 ⌊440 × ジョブ補正 ÷ 100⌋ ＋ 装備) × 1.05⌋（パーティボーナス、種族の補正なし）と
-//         一致することを確かめる
-// - 物理防御・魔法防御：各部位の値を etro.gg（https://etro.gg/api/equipment/<アイテムID>/）から取って足す
-// 装備を更新するときは gear-source.json の stats（サイトのステータス欄の数値）・food・weapon を書き換えて実行してください。
+// - 装備：装備名は tools/gear/gear-source.json の url（https://fuucdayo.com/gearset/<url>/）のページの、最初の装備パターンから取る。
+//         ステータスは、各部位の値を etro.gg（https://etro.gg/api/equipment/<アイテムID>/）から取り、自分で積み上げる：
+//           サブステータス（クリ・意思・DH・SS・不屈・信仰）＝ 基礎値（420、意思・信仰は 440）＋ 各部位（装備の値＋マテリア、
+//             部位ごとの上限まで。マテリアの値は https://etro.gg/api/materia/、カスタム武器はページの「ステータスの振り分け」）
+//           能力値（STR・DEX・VIT・INT・MND）＝ 装備だけの合計（ジョブの基礎値と種族の補正はツール側で足す）
+//           物理防御・魔法防御・武器の性能も etro.gg の値
+//         サイトのステータス欄（食事込み）とも比べ、食事の分を除いて合わないものは警告を出す（値は etro.gg から積み上げたものを使う）
+// 装備を更新するときは gear-source.json の url・food・pattern を書き換えて実行してください（stats は照合にだけ使います）。
 import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
@@ -47,70 +47,96 @@ function unfood(total, pct, max){
   for (let pre = total - max - 2; pre <= total; pre++) if (pre + Math.min(Math.floor(pre * pct / 100), max) === total) return pre;
   throw new Error(`食事の分を除けません: ${total}`);
 }
-const STAT = {'クリティカル':'crit', '意思力':'det', 'DH':'dh', 'スキルスピード':'ss', 'スペルスピード':'ss', '不屈':'ten', '信仰':'pie', 'VIT':'vit', 'MND':'mnd'};
-const source = JSON.parse(fs.readFileSync(path.join(here, 'gear-source.json'), 'utf8'));
-const ATTR = {STR:'str', DEX:'dex', VIT:'vit', INT:'int', MND:'mnd'};
+// サイトの表記 → ステータスのキー
+const STAT = {'クリティカル':'crit', '意思力':'det', 'DH':'dh', 'ダイレクトヒット':'dh', 'スキルスピード':'ss', 'スペルスピード':'ss', '不屈':'ten', '信仰':'pie',
+  'STR':'str', 'DEX':'dex', 'VIT':'vit', 'INT':'int', 'MND':'mnd'};
+// etro.gg・ゲームデータのパラメータ番号 → ステータスのキー
+const PARAM_ID = {1:'str', 2:'dex', 3:'vit', 4:'int', 5:'mnd', 6:'pie', 19:'ten', 22:'dh', 27:'crit', 44:'det', 45:'ss', 46:'ss'};
+const ATTR_KEYS = ['str', 'dex', 'vit', 'int', 'mnd'];
+const SUB_BASE = {crit:420, det:440, dh:420, ss:420, ten:420, pie:440}; // Lv100 のサブステータスの基礎値
 const LV_MAIN = 440, PARTY_BONUS = 5;
+const source = JSON.parse(fs.readFileSync(path.join(here, 'gear-source.json'), 'utf8'));
 const mctx = {window:{}};
 vm.createContext(mctx);
 vm.runInContext(fs.readFileSync(path.join(root, 'data/modifiers.js'), 'utf8'), mctx);
 const JOB_MODS = mctx.window.MP_JOB_MODS;
-// サイトの装備ページから、最初の装備パターンの部位と装備名を取る
+const etroGet = async p => { const r = await fetch(`https://etro.gg/api/${p}`); if (!r.ok) throw new Error(`etro.gg ${p}: ${r.status}`); return r.json(); };
+// マテリアのアイテムID → {ステータス, 値}
+const MATERIA = new Map();
+for (const m of await etroGet('materia/')) for (let t = 1; t <= 20; t++) if (m['tier' + t]) MATERIA.set(m['tier' + t].id, {k:PARAM_ID[m.param], v:m['tier' + t + 'Value']});
+// 日本語のアイテム名 → アイテムID（XIVAPI）、アイテムID → etro.gg の装備データ
+const idCache = new Map(), etroCache = new Map();
+async function itemId(name){
+  if (!idCache.has(name)) {
+    const hit = (await get('search', {sheets:'Item', query:`+Name="${name}"`, language:'ja', fields:'Name'})).results[0];
+    if (!hit) throw new Error(`アイテム「${name}」が見つかりません`);
+    idCache.set(name, hit.row_id);
+  }
+  return idCache.get(name);
+}
+async function etroItem(id){ if (!etroCache.has(id)) etroCache.set(id, await etroGet(`equipment/${id}/`)); return etroCache.get(id); }
+// サイトの装備ページから、最初の装備パターンの部位・装備名・マテリア・カスタム武器の振り分けを取る
 async function gearItems(url){
   const res = await fetch(`https://fuucdayo.com/gearset/${url}/`);
   if (!res.ok) throw new Error(`gearset/${url}: ${res.status}`);
   const first = (await res.text()).split('fr-gear-title')[1] || '';
-  return [...first.matchAll(/data-fr-slot="(\w+)"[^]*?<strong>([^<]*)<\/strong>/g)].map(m => ({slot:m[1], name:m[2]}));
+  return first.split('fr-gear-item').slice(1).map(it => {
+    const slot = (it.match(/data-fr-slot="(\w+)"/) || [])[1], name = (it.match(/<strong>([^<]*)<\/strong>/) || [])[1];
+    if (!slot || !name) return null;
+    const materia = [...it.matchAll(/class="fr-materia [^"]*" title="([^"]*)"/g)].map(m => m[1]);
+    const dist = {};
+    if (it.includes('ステータスの振り分け')) for (const m of it.split('ステータスの振り分け')[1].split('</dl>')[0].matchAll(/<dt>([^<]*)<\/dt><dd>([^<]*)<\/dd>/g)) if (STAT[m[1]]) dist[STAT[m[1]]] = (dist[STAT[m[1]]] || 0) + +m[2];
+    return {slot, name, materia, dist};
+  }).filter(Boolean);
 }
-// 装備1つの能力値（XIVAPI）と防御力（etro.gg）。同じ装備は何度も引かない
-const itemCache = new Map();
-async function itemInfo(name){
-  if (itemCache.has(name)) return itemCache.get(name);
-  const r = await get('search', {sheets:'Item', query:`+Name="${name}"`, language:'ja', fields:'Name,BaseParam[].Name,BaseParamValue'});
-  const hit = r.results[0];
-  if (!hit) throw new Error(`装備「${name}」が見つかりません`);
-  const attrs = {};
-  hit.fields.BaseParam.forEach((b, i) => { const k = b.fields && ATTR[b.fields.Name]; if (k) attrs[k] = (attrs[k] || 0) + hit.fields.BaseParamValue[i]; });
-  const e = await fetch(`https://etro.gg/api/equipment/${hit.row_id}/`);
-  if (!e.ok) throw new Error(`etro.gg: 装備「${name}」(${hit.row_id}) が見つかりません`);
-  const ej = await e.json();
-  const info = {id:hit.row_id, attrs, def:ej.defensePhys || 0, mdef:ej.defenseMag || 0};
-  itemCache.set(name, info);
-  return info;
+// 1部位のステータス：etro.gg の装備の値＋カスタム武器の振り分け＋マテリア（部位ごとの上限まで）
+async function slotStats(it){
+  const id = await itemId(it.name), e = await etroItem(id);
+  const st = {};
+  for (let i = 0; i < 6; i++) { const k = PARAM_ID[e['param' + i]]; if (k) st[k] = (st[k] || 0) + e['param' + i + 'Value']; }
+  for (const [k, v] of Object.entries(it.dist)) st[k] = (st[k] || 0) + v;
+  const cap = {};
+  for (const [p, v] of Object.entries(e.maxParams || {})) if (PARAM_ID[p]) cap[PARAM_ID[p]] = v;
+  const capped = [];
+  for (const mn of it.materia) {
+    const m = MATERIA.get(await itemId(mn));
+    if (!m) throw new Error(`マテリア「${mn}」が etro.gg にありません`);
+    const before = st[m.k] || 0, after = cap[m.k] != null ? Math.min(cap[m.k], before + m.v) : before + m.v;
+    if (after < before + m.v) capped.push(`${mn} は上限で ${after - before}`);
+    st[m.k] = after;
+  }
+  return {id, e, st, capped};
 }
 const gear = {};
 for (const [job, g] of Object.entries(source)) {
   const f = foodByName.get(g.food);
   if (!f) throw new Error(`${job}: 食事「${g.food}」が見つかりません`);
-  const st = {};
-  for (const [k, v] of Object.entries(g.stats)) if (STAT[k]) st[STAT[k]] = v;
-  for (const p of f.params) if (st[p.stat] != null) st[p.stat] = unfood(st[p.stat], p.pct, p.max);
-  const w = await get('search', {sheets:'Item', query:`+Name="${g.weapon}"`, language:'ja', fields:'Name,LevelItem.value,DamagePhys,DamageMag'});
-  const wf = w.results[0] && w.results[0].fields;
-  if (!wf) throw new Error(`${job}: 武器「${g.weapon}」が見つかりません`);
-  // 能力値と防御力を各部位から足す
-  const mods = JOB_MODS[job];
-  const attrs = Object.fromEntries(Object.values(ATTR).map(k => [k, 0]));
-  let def = 0, mdef = 0;
   const items = await gearItems(g.url);
   if (!items.length) throw new Error(`${job}: 装備ページから部位を読めません`);
+  const sub = {...SUB_BASE}, attrs = Object.fromEntries(ATTR_KEYS.map(k => [k, 0]));
+  let def = 0, mdef = 0, weapon = null;
+  const ids = [];
   for (const it of items) {
-    const info = await itemInfo(it.name);
-    for (const [k, v] of Object.entries(info.attrs)) attrs[k] += v;
-    def += info.def; mdef += info.mdef;
+    const s = await slotStats(it);
+    ids.push(s.id);
+    for (const [k, v] of Object.entries(s.st)) if (k in attrs) attrs[k] += v; else if (k in sub) sub[k] += v;
+    def += s.e.defensePhys || 0; mdef += s.e.defenseMag || 0;
+    if (it.slot === 'Weapon') weapon = {name:it.name, e:s.e};
+    if (s.capped.length) console.log(`  ${job} ${it.name}: ${s.capped.join('、')}`);
   }
-  // サイトの値（食事の分を除く）＝ ⌊(基礎値＋装備) × 1.05⌋ になっているか確かめる
-  for (const [label, k] of Object.entries(ATTR)) {
-    const site = k === 'vit' ? st.vit : g.stats[label];
-    if (site == null) continue;
-    const calc = Math.floor((Math.floor(LV_MAIN * mods[k] / 100) + attrs[k]) * (100 + PARTY_BONUS) / 100);
-    if (calc !== site) console.warn(`${job}: ${label} がサイトの値と合いません（計算 ${calc} / サイト ${site}）`);
-  }
-  gear[job] = {name:`Patch7.55 最終装備（${g.pattern}）`, source:`https://fuucdayo.com/gearset/${g.url}/`, weapon:g.weapon, ilvl:wf.LevelItem.value,
-    food:f.id, items:items.map(it => itemCache.get(it.name).id),
-    gearAttrs:attrs, stats:{crit:st.crit, det:st.det, dh:st.dh, ss:st.ss, ten:st.ten || 420, pie:st.pie || 440, def, mdef,
-      wd:wf.DamageMag, wdPhys:wf.DamagePhys}};
-  console.log(`${job}: VIT ${attrs.vit} / MND ${attrs.mnd} / 物理防御 ${def} / 魔法防御 ${mdef}`);
+  if (!weapon) throw new Error(`${job}: 武器が見つかりません`);
+  // サイトのステータス欄（食事込み）と照合する：サブステータスは食事の分を除いて、能力値は ⌊(基礎値＋装備) × 1.05⌋ と比べる
+  const site = {};
+  for (const [k, v] of Object.entries(g.stats)) if (STAT[k]) site[STAT[k]] = v;
+  for (const p of f.params) if (site[p.stat] != null) site[p.stat] = unfood(site[p.stat], p.pct, p.max);
+  const calc = {...sub};
+  for (const k of ATTR_KEYS) calc[k] = Math.floor((Math.floor(LV_MAIN * JOB_MODS[job][k] / 100) + attrs[k]) * (100 + PARTY_BONUS) / 100);
+  const diff = Object.keys(site).filter(k => k in calc && calc[k] !== site[k]).map(k => `${k} ${site[k]} → ${calc[k]}`);
+  if (diff.length) console.warn(`${job}: サイトの値と違うもの（サイト → etro.gg から積み上げた値）: ${diff.join(' / ')}`);
+  gear[job] = {name:`Patch7.55 最終装備（${g.pattern}）`, source:`https://fuucdayo.com/gearset/${g.url}/`, weapon:weapon.name, ilvl:weapon.e.itemLevel,
+    food:f.id, items:ids,
+    gearAttrs:attrs, stats:{...sub, def, mdef, wd:weapon.e.damageMag, wdPhys:weapon.e.damagePhys}};
+  console.log(`${job}: クリ ${sub.crit} / 意思 ${sub.det} / DH ${sub.dh} / SS ${sub.ss} / 不屈 ${sub.ten} / 信仰 ${sub.pie} / VIT ${calc.vit} / 物防 ${def} / 魔防 ${mdef} / 武器 ${weapon.e.damageMag}/${weapon.e.damagePhys}`);
 }
 
 // ----- 書き出し（1行に1件）-----
@@ -126,11 +152,12 @@ ${lines(foods.map(f => '  ' + JSON.stringify(f)))}
 fs.writeFileSync(path.join(root, 'data/gear.js'), `'use strict';
 // ジョブごとの装備プリセット（メンバーのステータスが空欄のときの標準値）。
 // https://fuucdayo.com/battle/8759/ の「Patch7.55 最終装備」の各ジョブの最初の装備パターンから作りました。
-// サイトの数値は食事込みなので、ここでは食事の分を除いた「装備だけ」の値にしています（食事は food で選ぶ）。
+// 装備名はサイトの装備ページから取り、ステータスは etro.gg の各部位の値（装備＋マテリア、部位ごとの上限まで）から積み上げています。
+// 食事の分は含みません（食事は food で選ぶ）。サイトのステータス欄（食事の分を除く）とも照合しています。
 // gearAttrs は STR・DEX・VIT・INT・MND の装備だけの合計（ジョブの基礎値・種族の補正・パーティボーナス +5% は含まない）。
-// def / mdef は物理防御・魔法防御（各部位の値を etro.gg から取って足したもの）。items は装備のアイテムID。
+// def / mdef は物理防御・魔法防御、wd / wdPhys は武器の魔法・物理性能（どれも etro.gg の値）。items は装備のアイテムID。
 // food は data/foods.js の id（サイトで使っている食事）。wd は武器の魔法性能（回復量の計算に使う）、wdPhys は物理性能。
-// ten / pie は、その装備で上がっていなければ基準値（不屈 420、信仰 440）。
+// サブステータスは基礎値（クリ・DH・SS・不屈 420、意思・信仰 440）込み。
 // 作り直すとき: tools/gear/gear-source.json を直してから node tools/gear/build-gear-data.mjs
 window.MP_GEAR = {
 ${lines(Object.entries(gear).map(([k, v]) => '  ' + k + ': ' + JSON.stringify(v)))}
