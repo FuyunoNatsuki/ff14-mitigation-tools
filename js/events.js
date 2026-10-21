@@ -185,19 +185,26 @@ document.addEventListener('click', ev => {
   saveSettings(); renderAll();
 });
 
-// 各セクションの折り畳み（見出しの右のボタン。開閉はこのブラウザに覚えておく）
-function initFolds(){
+// 右上のメニュー（ハンバーガー）：戻る・進むと、各セクションの表示・非表示（このブラウザに覚えておく）
+function initSectionMenu(){
   const saved = store.get('fflp-fold') || {};
+  const box = $('menuSections');
   for (const sec of document.querySelectorAll('section.fold')) {
-    const key = sec.dataset.fold, head = sec.querySelector('.fold-head'), body = sec.querySelector('.fold-body');
-    if (!head || !body) continue;
-    body.id = body.id || 'fold-' + key;
-    const btn = document.createElement('button');
-    btn.type = 'button'; btn.className = 'fold-btn'; btn.setAttribute('aria-controls', body.id);
-    const set = open => { sec.classList.toggle('collapsed', !open); btn.setAttribute('aria-expanded', String(open)); btn.textContent = open ? '畳む' : '開く'; btn.title = open ? 'このセクションを畳む' : 'このセクションを開く'; };
+    const key = sec.dataset.fold;
+    const h = sec.querySelector('.fold-head h2');
+    const row = document.createElement('label');
+    row.className = 'menu-item menu-check';
+    row.innerHTML = `<input type="checkbox"> ${esc((h ? h.textContent : key).trim())}`;
+    const cb = row.querySelector('input');
+    const set = show => { sec.classList.toggle('sec-hidden', !show); cb.checked = show; };
     set(saved[key] !== false);
-    btn.addEventListener('click', () => { const open = sec.classList.contains('collapsed'); set(open); const s = store.get('fflp-fold') || {}; s[key] = open; store.set('fflp-fold', s); });
-    head.appendChild(btn);
+    cb.addEventListener('change', () => { set(cb.checked); const s = store.get('fflp-fold') || {}; s[key] = cb.checked; store.set('fflp-fold', s); });
+    box.appendChild(row);
   }
+  const btn = $('menuBtn'), panel = $('menuPanel');
+  const setMenu = open => { panel.hidden = !open; btn.setAttribute('aria-expanded', String(open)); };
+  btn.addEventListener('click', e => { e.stopPropagation(); setMenu(panel.hidden); });
+  document.addEventListener('click', e => { if (!panel.hidden && !panel.contains(e.target) && !btn.contains(e.target)) setMenu(false); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !panel.hidden) { setMenu(false); btn.focus(); } });
 }
-initFolds();
+initSectionMenu();

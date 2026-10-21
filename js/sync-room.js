@@ -4,7 +4,12 @@
 // ----- URLで共有するルーム（中継サーバーの REST とストリーミング）-----
 // ブラウザがつなぐのは中継サーバー（worker/ の Cloudflare Worker）だけ。データベースのURLは中継の中にしかない。
 const ROOM_API = 'https://mitigation-planner-rooms.mitigation-planner-rooms.workers.dev';
-const Room = {db:null, id:null, es:null, mirror:{}, clientId:uid(), hb:null, fightVer:null, baseTypes:{}, peers:[], connected:false, syncTimer:null};
+// tl: 自分が表示している TL（'' はルーム直下の TL。追加した TL は tls/<ID> の下）
+const Room = {db:null, id:null, es:null, mirror:{}, clientId:uid(), hb:null, fightVer:null, baseTypes:{}, peers:[], connected:false, syncTimer:null, tl:''};
+const validTlId = id => /^[a-z0-9]{6,16}$/.test(String(id || ''));
+// 表示中の TL の項目へのパス（ルーム直下の TL は項目名だけ）
+const tlPath = p => (Room.tl ? `tls/${Room.tl}${p ? '/' + p : ''}` : p);
+const tlPrefKey = () => 'fflp-roomtl-' + Room.id;
 // 中継サーバー（workers.dev か、手元で動かすときの localhost）以外へは送らない
 function normDb(u){
   u = String(u || '').trim().replace(/\/+$/, '');
@@ -34,35 +39,67 @@ function roomWriteError(e){
 const roomBody = e => { const o = {mitId:e.mitId, t:e.t, target:e.target, caster:e.caster || null, by:Room.clientId}; if (e.custom) o.custom = {...e.custom}; if (e.ovr) o.ovr = {...e.ovr}; return o; };
 const roomFightBody = f => ({json:JSON.stringify(packFight(f)), ver:uid(), name:f.name, at:{'.sv':'timestamp'}});
 const roomMember = m => { const o = {job:m.job, name:m.name, pid:m.pid, food:m.food || '', race:m.race || ''}; for (const k of STAT_KEYS) o[k] = m[k] || 0; return o; };
+// TL 1つ分の中身（戦闘・プラン・メンバー・人数・上書き）
+function roomTlBody(f, planList, extra){
+  const planObj = {};
+  for (const e of (planList || []).filter(validEntry)) planObj[uid()] = roomBody(cleanEntry(toEntry('x', e)));
+  const saveFight = fight; fight = f;
+  const mem = extra && extra.members ? mergeMembers(extra.members) : defaultMembers(f);
+  fight = saveFight;
+  const ovr = cleanOverrides(extra && extra.overrides);
+  return {fight:roomFightBody(f), plan:Object.keys(planObj).length ? planObj : null,
+    members:Object.fromEntries(mem.map(m => [m.id, roomMember(m)])), partySize:(extra && extra.partySize) || defaultPartySize(f),
+    overrides:Object.keys(ovr).length ? ovr : null};
+}
+const newTlId = () => newRoomId().slice(0, 10);
 const RoomOps = {
-  add(e){ plan.push(e); renderAll(); roomReq('PUT', 'plan/' + e.uid, roomBody(e)).catch(roomWriteError); },
-  update(e){ renderAll(); roomReq('PUT', 'plan/' + e.uid, roomBody(e)).catch(roomWriteError); },
-  remove(id){ plan = plan.filter(e => e.uid !== id); renderAll(); roomReq('DELETE', 'plan/' + id).catch(roomWriteError); },
-  clear(){ plan = []; renderAll(); roomReq('DELETE', 'plan').catch(roomWriteError); },
-  setType(id, t){ fight.abilityTypes[id] = t; renderAll(); roomReq('PATCH', 'types', {[id]:t}).catch(roomWriteError); },
-  setMember(m){ renderAll(); roomReq('PUT', 'members/' + m.id, roomMember(m)).catch(roomWriteError); },
-  setPartySize(n){ partySize = n; renderAll(); roomReq('PUT', 'partySize', n).catch(roomWriteError); },
-  setOverride(k, v){ if (v) overrides[k] = v; else delete overrides[k]; renderAll(); (v ? roomReq('PUT', 'overrides/' + k, v) : roomReq('DELETE', 'overrides/' + k)).catch(roomWriteError); },
+  add(e){ plan.push(e); renderAll(); roomReq('PUT', tlPath('plan/' + e.uid), roomBody(e)).catch(roomWriteError); },
+  update(e){ renderAll(); roomReq('PUT', tlPath('plan/' + e.uid), roomBody(e)).catch(roomWriteError); },
+  remove(id){ plan = plan.filter(e => e.uid !== id); renderAll(); roomReq('DELETE', tlPath('plan/' + id)).catch(roomWriteError); },
+  clear(){ plan = []; renderAll(); roomReq('DELETE', tlPath('plan')).catch(roomWriteError); },
+  setType(id, t){ fight.abilityTypes[id] = t; renderAll(); roomReq('PATCH', tlPath('types'), {[id]:t}).catch(roomWriteError); },
+  setMember(m){ renderAll(); roomReq('PUT', tlPath('members/' + m.id), roomMember(m)).catch(roomWriteError); },
+  setPartySize(n){ partySize = n; renderAll(); roomReq('PUT', tlPath('partySize'), n).catch(roomWriteError); },
+  setOverride(k, v){ if (v) overrides[k] = v; else delete overrides[k]; renderAll(); (v ? roomReq('PUT', tlPath('overrides/' + k), v) : roomReq('DELETE', tlPath('overrides/' + k))).catch(roomWriteError); },
   // 攻撃の追加・削除：戦闘データだけ書き直す（プラン・メンバーはそのまま）
   updateFight(f){
     const body = roomFightBody(f);
     Room.fightVer = body.ver; Room.baseTypes = {...f.abilityTypes}; fight = f; renderAll();
-    roomReq('PUT', 'fight', body).catch(roomWriteError);
+    roomReq('PUT', tlPath('fight'), body).catch(roomWriteError);
   },
-  // 戦闘を入れ替えるときは、ルームのプラン・メンバー・上書きも一緒に入れ替える（1回の書き込みで）
+  // ログの読み込み・新しいTL：ルームに TL を1つ足して、自分の表示をその TL にする（ほかの人の表示はそのまま）
   async loadFight(f, planList, extra){
-    const planObj = {};
-    for (const e of (planList || []).filter(validEntry)) planObj[uid()] = roomBody(cleanEntry(toEntry('x', e)));
-    const saveFight = fight; fight = f;
-    const mem = extra && extra.members ? mergeMembers(extra.members) : defaultMembers(f);
-    fight = saveFight;
-    const ovr = cleanOverrides(extra && extra.overrides);
-    try { await roomReq('PATCH', '', {fight:roomFightBody(f), types:null, plan:Object.keys(planObj).length ? planObj : null,
-      members:Object.fromEntries(mem.map(m => [m.id, roomMember(m)])), partySize:(extra && extra.partySize) || defaultPartySize(f),
-      overrides:Object.keys(ovr).length ? ovr : null}); }
-    catch (e) { roomWriteError(e); }
+    const id = newTlId();
+    try {
+      await roomReq('PUT', 'tls/' + id, roomTlBody(f, planList, extra));
+      selectRoomTl(id);
+    } catch (e) { roomWriteError(e); }
   },
 };
+
+// ルームにある TL の一覧（ルーム直下の TL と tls/<ID> の TL）。作った順
+function roomTlList(){
+  const m = Room.mirror || {}, out = [];
+  const nameOf = x => String((x.fight && x.fight.name) || 'TL').slice(0, 60);
+  if (m.fight) out.push({id:'', name:nameOf(m), at:+m.fight.at || 0});
+  for (const [id, x] of Object.entries(m.tls || {})) if (validTlId(id) && x && x.fight) out.push({id, name:nameOf(x), at:+x.fight.at || 0});
+  return out.sort((a, b) => a.at - b.at);
+}
+// 自分が表示する TL を切り替える（このブラウザに覚えておく）
+function selectRoomTl(id){
+  Room.tl = id; Room.fightVer = null;
+  store.set(tlPrefKey(), id);
+  resetHistory();
+  syncFromMirror();
+  sendPresence();
+}
+// TL をルームから消す（全員の一覧から消える）
+async function deleteRoomTl(id){
+  try {
+    if (id) await roomReq('DELETE', 'tls/' + id);
+    else await roomReq('PATCH', '', {fight:null, plan:null, types:null, members:null, partySize:null, overrides:null});
+  } catch (e) { roomWriteError(e); }
+}
 
 // ストリーミングで届く put / patch をローカルの写しに当てはめる
 function applyRoomEvent(type, msg){
@@ -81,7 +118,16 @@ function applyRoomEvent(type, msg){
   Room.syncTimer = setTimeout(syncFromMirror, 30);
 }
 function syncFromMirror(){
-  const m = Room.mirror || {};
+  const root = Room.mirror || {};
+  // 表示する TL：自分が選んだもの。なくなっていたら、前に選んだもの・いちばん新しいもの
+  const list = roomTlList();
+  if (!list.some(x => x.id === Room.tl)) {
+    const pref = store.get(tlPrefKey());
+    const next = list.find(x => x.id === pref) || list[list.length - 1];
+    Room.tl = next ? next.id : ''; Room.fightVer = null;
+    resetHistory();
+  }
+  const m = Room.tl ? ((root.tls || {})[Room.tl] || {}) : root;
   const fd = m.fight;
   if (!fd) { if (fight) { fight = null; Room.fightVer = null; plan = []; } }
   else if (fd.ver !== Room.fightVer) {
@@ -100,17 +146,18 @@ function syncFromMirror(){
   }
   plan = Object.entries(m.plan || {}).map(([id, x]) => toEntry(id, x || {})).filter(validEntry);
   if (selEntry && !plan.some(e => e.uid === selEntry)) selEntry = null;
-  // 自分の最終更新時刻を基準に、45秒以上更新のない人は退出扱い
-  const pres = m.presence || {};
+  // 自分の最終更新時刻を基準に、45秒以上更新のない人は退出扱い。選んでいる攻撃は、同じ TL を見ている人のものだけ出す
+  const pres = root.presence || {};
   const mine = pres[Room.clientId] && pres[Room.clientId].at;
   Room.peers = Object.entries(pres).filter(([id, p]) => p && (id === Room.clientId || !mine || p.at > mine - 45000))
-    .map(([id, p]) => ({id, name:String(p.name || '名無し').slice(0, 20), sel:typeof p.sel === 'number' ? p.sel : null}));
+    .map(([id, p]) => ({id, name:String(p.name || '名無し').slice(0, 20), sel:typeof p.sel === 'number' && (p.tl || '') === Room.tl ? p.sel : null}));
   renderPeers();
   renderAll();
+  syncHistory();
 }
 function sendPresence(){
   if (mode !== 'room') return;
-  roomReq('PUT', 'presence/' + Room.clientId, {name:myName(), sel:selCast == null ? null : selCast, at:{'.sv':'timestamp'}}).catch(() => {});
+  roomReq('PUT', 'presence/' + Room.clientId, {name:myName(), sel:selCast == null ? null : selCast, tl:Room.tl, at:{'.sv':'timestamp'}}).catch(() => {});
 }
 async function startRoom(db, id, seed){
   mode = 'room'; readOnly = false;
@@ -122,13 +169,18 @@ async function startRoom(db, id, seed){
     ? 'ローカルのファイルで開いているため、このリンクはほかの人の環境では開けません。相手にもこのHTMLファイルを渡し、ルームID「' + id + '」で参加してもらってください。ルームIDを知っている人は誰でも編集できます。'
     : 'このリンクを開いた人は、アカウントなしで誰でも編集できます。リンクは信頼できるメンバーにだけ渡してください。';
   setModeBadge();
+  Room.tl = store.get(tlPrefKey()) || '';
   if (seed) {
-    // 今表示している戦闘・メンバー・プランをそのままルームに入れる
+    // 今表示している戦闘・メンバー・プランを、ルームの最初の TL として入れる
     setStatus('ルームを作っています…');
-    try { await roomReq('PUT', '', {fight:seed.fight ? roomFightBody(seed.fight) : null,
-      plan:Object.fromEntries(seed.plan.map(e => [e.uid, roomBody(e)])), types:seed.types || null,
-      members:Object.fromEntries(seed.members.map(m => [m.id, roomMember(m)])), partySize:seed.partySize,
-      overrides:Object.keys(seed.overrides).length ? seed.overrides : null}); }
+    const id = newTlId();
+    try {
+      await roomReq('PUT', '', seed.fight ? {tls:{[id]:{fight:roomFightBody(seed.fight),
+        plan:Object.fromEntries(seed.plan.map(e => [e.uid, roomBody(e)])), types:seed.types || null,
+        members:Object.fromEntries(seed.members.map(m => [m.id, roomMember(m)])), partySize:seed.partySize,
+        overrides:Object.keys(seed.overrides).length ? seed.overrides : null}}} : {});
+      Room.tl = id; store.set(tlPrefKey(), id);
+    }
     catch (e) { roomWriteError(e); return; }
   } else {
     fight = null; plan = []; renderAll();

@@ -12,10 +12,14 @@
 //   PUT    /rooms/<ルームID>            ルームを作る（中身を丸ごと書く）
 //   PATCH  /rooms/<ルームID>            ルームの一部をまとめて書き換える
 //   PUT/PATCH/DELETE /rooms/<ルームID>/<項目>[/...]  項目ごとの書き込み・削除
+//   PUT/PATCH/DELETE /rooms/<ルームID>/tls/<TL ID>[/<項目>[/...]]  ルームに追加した TL ごとの書き込み・削除
 // それ以外（ルーム全体の削除、ルームの一覧、決められていない項目）は断る。
 
 const ROOM_ID = /^[a-z0-9]{12}$/;
-const KEYS = new Set(['fight', 'plan', 'types', 'members', 'partySize', 'overrides', 'presence']);
+const KEYS = new Set(['fight', 'plan', 'types', 'members', 'partySize', 'overrides', 'presence', 'tls']);
+// tls/<TL ID>/ の下に置ける項目（ルーム直下の TL と同じ）
+const TL_KEYS = new Set(['fight', 'plan', 'types', 'members', 'partySize', 'overrides']);
+const TL_ID = /^[a-z0-9]{6,16}$/;
 const SEGMENT = /^[A-Za-z0-9_-]{1,32}$/;
 const MAX_BODY = 2_500_000; // 戦闘データ（最大 2,000,000 文字）に余裕を持たせた上限
 // Firebase のルールでは auth.uid がこの値のときだけ読み書きを許す
@@ -35,7 +39,8 @@ export default {
       const segs = url.pathname.split('/').filter(Boolean);
       if (segs[0] !== 'rooms' || !ROOM_ID.test(segs[1] || '')) return text(404, 'Not found.', cors);
       const sub = segs.slice(2);
-      if (sub.length && (!KEYS.has(sub[0]) || sub.length > 3 || !sub.every(s => SEGMENT.test(s)))) return text(400, 'Unknown item.', cors);
+      if (sub.length && (!KEYS.has(sub[0]) || !sub.every(s => SEGMENT.test(s)))) return text(400, 'Unknown item.', cors);
+      if (sub[0] === 'tls' ? (sub.length < 2 || !TL_ID.test(sub[1]) || sub.length > 4 || (sub[2] && !TL_KEYS.has(sub[2]))) : sub.length > 3) return text(400, 'Unknown item.', cors);
 
       const method = request.method;
       if (method === 'GET' && sub.length) return text(405, 'Only the whole room can be read.', cors);

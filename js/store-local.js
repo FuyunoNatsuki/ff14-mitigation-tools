@@ -25,7 +25,39 @@ function saveLocal(){
   store.set(localKey('fflp-members-'), {members:membersObj(members), partySize});
   store.set(localKey('fflp-ovr-'), overrides);
   // 最後に開いていた戦闘（手入力のTLを含む）を覚えておき、次に開いたときに出す。中身が変わったときだけ書く
-  if (savedFightRef !== fight) { savedFightRef = fight; store.set('fflp-lastfight', packFight(fight)); }
+  if (savedFightRef !== fight) {
+    savedFightRef = fight;
+    const packed = packFight(fight);
+    store.set('fflp-lastfight', packed);
+    // TL の一覧にも入れる（プルダウンで切り替えられるように）
+    store.set('fflp-fight-' + fight.key, packed);
+    const list = localTlList().filter(x => x.key !== fight.key);
+    const old = localTlList().find(x => x.key === fight.key);
+    list.push({key:fight.key, name:fight.name, at:old ? old.at : Date.now()});
+    store.set('fflp-tls', list);
+  }
+}
+// このブラウザに保存した TL の一覧（作った順）
+function localTlList(){
+  const l = store.get('fflp-tls');
+  return Array.isArray(l) ? l.filter(x => x && typeof x.key === 'string').sort((a, b) => (a.at || 0) - (b.at || 0)) : [];
+}
+function selectLocalTl(key){
+  const p = store.get('fflp-fight-' + key);
+  if (!p) return setStatus('このTLのデータが見つかりませんでした。', 'err');
+  try { setFight(unpackFight(p), null, null); resetHistory(); setStatus(`TL「${fight.name}」を表示しています。`, 'ok'); }
+  catch (e) { setStatus('このTLのデータを読み取れませんでした。', 'err'); }
+}
+// TL をこのブラウザから消す（戦闘・プラン・メンバー・上書き）。表示中なら、ほかの TL に切り替える
+function deleteLocalTl(key){
+  for (const p of ['fflp-fight-', 'fflp-plan-', 'fflp-types-', 'fflp-members-', 'fflp-ovr-']) store.del(p + key);
+  store.set('fflp-tls', localTlList().filter(x => x.key !== key));
+  if (fight && fight.key === key) {
+    const rest = localTlList();
+    savedFightRef = null; store.del('fflp-lastfight');
+    if (rest.length) selectLocalTl(rest[rest.length - 1].key);
+    else { fight = null; plan = []; resetHistory(); renderAll(); }
+  } else renderAll();
 }
 function cleanEntry(e){ const o = {uid:e.uid, mitId:e.mitId, t:e.t, target:e.target, caster:e.caster || null}; if (e.custom) o.custom = {...e.custom}; if (e.ovr && Object.keys(e.ovr).length) o.ovr = {...e.ovr}; return o; }
 function validEntry(e){ return e && (e.custom || Object.hasOwn(MIT, e.mitId)) && isFinite(e.t); }
@@ -54,7 +86,9 @@ function setFight(f, planList, extra){
 }
 
 
-const ops = () => mode === 'shared' ? SharedOps : mode === 'room' ? RoomOps : Local;
+const rawOps = () => mode === 'shared' ? SharedOps : mode === 'room' ? RoomOps : Local;
+// 操作は戻る・進むの履歴に記録する（js/history.js）
+const ops = () => recorded(rawOps());
 // 手入力の回復量・HoT の1回分・バリア量を、正の整数だけ取り込む
 function cleanOvr(x){
   if (!x || typeof x !== 'object') return null;

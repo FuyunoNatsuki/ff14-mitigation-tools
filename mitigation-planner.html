@@ -23,7 +23,22 @@
   <header>
     <h1><small>FINAL FANTASY XIV 軽減プランナー</small>Mitigation Planner</h1>
     <div class="formula">予測被ダメ = 元ダメージ（防御力を計上する前）× Π(1−軽減) × 不屈 × 防御力</div>
+    <div class="menu-wrap">
+      <button class="menu-btn" id="menuBtn" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="menuPanel" title="メニュー" aria-label="メニュー"><span></span><span></span><span></span></button>
+      <div class="menu-panel" id="menuPanel" hidden>
+        <div class="menu-h">操作</div>
+        <button type="button" class="menu-item" id="undoBtn" disabled>元に戻す<kbd>Ctrl+Z</kbd></button>
+        <button type="button" class="menu-item" id="redoBtn" disabled>やり直す<kbd>Ctrl+Y</kbd></button>
+        <div class="menu-h">表示するセクション</div>
+        <div id="menuSections"></div>
+      </div>
+    </div>
   </header>
+  <div class="tl-bar" id="tlBar" hidden>
+    <label class="f" for="tlSel">表示するTL<select id="tlSel"></select></label>
+    <span class="sub" id="tlCount"></span>
+    <button class="btn danger small" id="tlDel" type="button">このTLを削除</button>
+  </div>
 
   <section class="card fold" data-fold="load">
     <div class="fold-head share-bar">
@@ -243,6 +258,7 @@
 <script src="js/hp.js"></script>
 <script src="js/render.js"></script>
 <script src="js/store-local.js"></script>
+<script src="js/history.js"></script>
 <script src="js/sync-claude.js"></script>
 <script src="js/sync-room.js"></script>
 <script src="js/peers.js"></script>

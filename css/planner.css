@@ -264,11 +264,23 @@ footer{font-size:.74rem;color:var(--muted);max-width:90ch}
 
 /* ===== 折り畳み ===== */
 .fold-head{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
-.fold-btn{margin-left:auto;border:1px solid var(--line);background:var(--bg);color:var(--muted);border-radius:6px;padding:3px 10px;font-size:.76rem;font-weight:700}
-.fold-btn:hover{color:var(--fg);border-color:var(--accent)}
-section.fold.collapsed .fold-body{display:none}
+section.fold.sec-hidden{display:none}
 .share-bar.fold-head .peers{margin-left:auto}
-.share-bar.fold-head .fold-btn{margin-left:0}
+/* 右上のメニュー（ハンバーガー） */
+.menu-wrap{position:relative;margin-left:auto;align-self:center}
+.menu-btn{display:flex;flex-direction:column;justify-content:center;gap:4px;width:38px;height:38px;padding:0 9px;border:1px solid var(--line);border-radius:8px;background:var(--panel);cursor:pointer}
+.menu-btn span{display:block;height:2px;border-radius:1px;background:var(--fg)}
+.menu-btn:hover,.menu-btn[aria-expanded="true"]{border-color:var(--accent)}
+.menu-panel{position:absolute;right:0;top:calc(100% + 6px);z-index:50;min-width:240px;padding:8px;border:1px solid var(--line);border-radius:10px;background:var(--panel);box-shadow:0 8px 24px rgba(0,0,0,.18)}
+.menu-h{font-size:.72rem;font-weight:700;letter-spacing:.1em;color:var(--muted);padding:8px 8px 4px}
+.menu-item{display:flex;align-items:center;gap:8px;width:100%;padding:7px 8px;border:0;border-radius:6px;background:none;color:var(--fg);font:inherit;font-size:.86rem;text-align:left;cursor:pointer}
+.menu-item:hover:not(:disabled){background:var(--accent-soft)}
+.menu-item:disabled{color:var(--muted);cursor:default}
+.menu-item kbd{margin-left:auto;font-size:.72rem;color:var(--muted);font-family:inherit}
+.menu-check input{width:auto;margin:0}
+/* TL の切り替え */
+.tl-bar{display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px;margin:12px 0 0;padding:10px 14px;border:1px solid var(--line);border-radius:10px;background:var(--panel)}
+.tl-bar .f{flex:1 1 260px;max-width:480px}
 
 /* ===== 攻撃を追加 ===== */
 details.add-cast{margin-bottom:12px;border:1px dashed var(--line);border-radius:8px;padding:8px 12px}

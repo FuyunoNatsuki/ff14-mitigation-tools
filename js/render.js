@@ -26,7 +26,7 @@ function renderAll(){
   // TL（ログから作ったもの・手入力のもの）がないあいだは、読み込み・共有以外のセクションを隠す
   document.body.classList.toggle('no-fight', !fight);
   renderMembers();
-  if (!fight) return renderEmpty();
+  if (!fight) { renderEmpty(); renderTlBar(); syncHistory(); return; }
   plan.forEach(fixEntry);
   EVALS = fight.casts.map(evalCast);
   SIM = simulateHp(EVALS);
@@ -34,7 +34,54 @@ function renderAll(){
   const vis = visibleCasts(EVALS);
   renderSummary(vis); renderPhaseBar(); renderPhaseList(); renderJobFilter(); renderPalette(); renderTimeline(vis); renderTable(vis); renderEdit(); renderInsertAt(); renderControls(); renderAddCast();
   if (mode === 'local') saveLocal();
+  renderTlBar();
+  syncHistory();
 }
+
+// ===== TL の切り替え・削除（ページ上部のプルダウン）=====
+// ルーム：ルームにある TL（自分が見るものを選ぶ。ほかの人の表示は変わらない）。ローカル：このブラウザに保存した TL
+function tlEntries(){
+  if (mode === 'room') return roomTlList().map(x => ({id:x.id, name:x.name}));
+  if (mode === 'local') return localTlList().map(x => ({id:x.key, name:x.name}));
+  return [];
+}
+const currentTlId = () => mode === 'room' ? Room.tl : fight ? fight.key : null;
+let tlDelArmed = false;
+function renderTlBar(){
+  const bar = $('tlBar'), sel = $('tlSel');
+  const list = tlEntries();
+  bar.hidden = !list.length;
+  if (!list.length || document.activeElement === sel) return;
+  const cur = currentTlId();
+  sel.innerHTML = list.map((x, i) => `<option value="${esc(x.id)}">${i + 1}. ${esc(x.name)}</option>`).join('') +
+    (list.some(x => x.id === cur) ? '' : '<option value="__none" selected>（選んでください）</option>');
+  if (list.some(x => x.id === cur)) sel.value = cur;
+  $('tlCount').textContent = mode === 'room' ? `ルームの TL ${list.length} 件` : `このブラウザの TL ${list.length} 件`;
+  const del = $('tlDel');
+  del.disabled = readOnly || !list.some(x => x.id === cur);
+  if (!tlDelArmed) del.textContent = mode === 'room' ? 'このTLをルームから削除' : 'このTLを削除';
+}
+$('tlSel').addEventListener('change', e => {
+  const id = e.target.value; e.target.blur();
+  if (id === '__none') return;
+  tlDelArmed = false; selCast = null; selEntry = null; openRows = new Set();
+  if (mode === 'room') selectRoomTl(id); else if (mode === 'local') selectLocalTl(id);
+});
+// 削除は2回押しで確認する。ルームでは全員の一覧から消える
+$('tlDel').addEventListener('click', e => {
+  const id = currentTlId(), b = e.currentTarget;
+  if (readOnly || id == null) return;
+  if (!tlDelArmed) {
+    tlDelArmed = true;
+    b.textContent = mode === 'room' ? 'もう一度押すと全員の一覧から削除' : 'もう一度押すと削除';
+    setTimeout(() => { if (tlDelArmed) { tlDelArmed = false; renderTlBar(); } }, 3000);
+    return;
+  }
+  tlDelArmed = false;
+  const name = (tlEntries().find(x => x.id === id) || {}).name || 'TL';
+  if (mode === 'room') deleteRoomTl(id); else deleteLocalTl(id);
+  setStatus(`TL「${name}」を削除しました。`, 'ok');
+});
 function renderEmpty(){
   $('summary').innerHTML = mode === 'shared'
     ? '<span class="sub">共有中の戦闘はまだありません。書き出したデータを「データを読み込む」で取り込むか、新しいTLを作ってください。</span>'
