@@ -106,6 +106,9 @@ details.cred .row{margin-top:10px}
 .pbtn{border:0;padding:0;background:none;border-radius:6px}
 .pbtn:hover:not(:disabled) .ico{outline:2px solid var(--fg);outline-offset:1px}
 .pbtn:disabled{opacity:.4;cursor:default}
+/* 選んだ攻撃の配置位置でリキャスト中のスキル（押せば置ける） */
+.pbtn.cd .ico{opacity:.35;filter:grayscale(1)}
+.pbtn.cd:hover:not(:disabled) .ico{opacity:.7}
 .insert-at{font-size:.82rem;color:var(--muted)}
 .insert-at strong{font-family:var(--f-display);color:var(--accent)}
 

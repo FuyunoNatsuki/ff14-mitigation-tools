@@ -130,10 +130,13 @@ function renderMembers(){
 
 function renderPalette(){
   const fs = jobFilterSet();
+  // 攻撃を選んでいるときは、配置位置の時刻にリキャストが上がっていない（使えない）スキルを灰色にする（押せば置ける）
+  const at = selCast != null ? insertTime() : null;
   const rows = activeMembers().filter(m => passesJobFilter(m, fs)).map(m => {
     const acts = ACTIONS.filter(d => d.tab === settings.tab && d.jobs.includes(m.job));
     return `<div class="prow"><span class="who">${jobBadge(m)}<span style="overflow:hidden;text-overflow:ellipsis">${esc(memberName(m))}</span></span>
-      ${acts.map(d => `<button type="button" class="pbtn" data-add="${d.id}" data-caster="${m.id}" title="${esc(actionTip(d))}" ${readOnly ? 'disabled' : ''}>${iconHtml(d, d.kind)}</button>`).join('') || '<span class="sub">配置できるスキルなし</span>'}</div>`;
+      ${acts.map(d => { const cd = at != null && !canUseAt(m.id, d.id, at);
+        return `<button type="button" class="pbtn${cd ? ' cd' : ''}" data-add="${d.id}" data-caster="${m.id}" title="${esc(actionTip(d))}${cd ? `\n${fmtT(at)} はリキャスト中（置くことはできます）` : ''}" ${readOnly ? 'disabled' : ''}>${iconHtml(d, d.kind)}</button>`; }).join('') || '<span class="sub">配置できるスキルなし</span>'}</div>`;
   });
   if (settings.tab === 'mit') rows.push(`<div class="prow"><span class="who"><span class="jb none">他</span>自由入力</span><button type="button" class="pbtn" data-add="__custom" title="%と秒を指定して軽減を作る" ${readOnly ? 'disabled' : ''}>${iconHtml({name:'自作軽減', abbr:'＋', custom:true}, 'custom')}</button></div>`);
   $('palette').innerHTML = rows.join('');
@@ -143,23 +146,35 @@ function renderPalette(){
 // チャージは1つずつ順番に回復する（回復中のチャージが戻ると、次のチャージの回復が始まる）。
 // 戻り値: clash = チャージが残っていないのに置いたもの、until = そのとき使ったチャージが戻る時刻、left = 使ったあとの残りチャージ
 function recastState(){
-  const clash = new Set(), until = new Map(), left = new Map(), groups = {};
+  const st = {clash:new Set(), until:new Map(), left:new Map()}, groups = {};
   for (const e of plan) { if (e.custom || !entryLive(e)) continue; (groups[e.caster + '|' + e.mitId] ||= []).push(e); }
-  for (const list of Object.values(groups)) {
-    list.sort((a, b) => a.t - b.t);
-    const def = MIT[list[0].mitId], max = def.charges || 1, r = def.r || 0;
-    let ch = max, next = null; // next: 回復中のチャージが戻る時刻
-    for (const e of list) {
-      while (next != null && next <= e.t + 1e-6) { ch++; next = ch < max ? next + r : null; }
-      if (ch <= 0) { clash.add(e.uid); until.set(e.uid, next); left.set(e.uid, 0); continue; }
-      ch--;
-      if (next == null) next = e.t + r;
-      // いま使ったチャージは、回復待ちの列のいちばん後ろで戻る
-      until.set(e.uid, next + (max - ch - 1) * r);
-      left.set(e.uid, ch);
-    }
+  for (const list of Object.values(groups)) chargeSim(list, MIT[list[0].mitId], st);
+  return st;
+}
+// 同じ人の同じスキルの使用（list）を時刻順にたどり、チャージが残っていない使用を st.clash に入れる
+function chargeSim(list, def, st){
+  list.sort((a, b) => a.t - b.t);
+  const max = def.charges || 1, r = def.r || 0;
+  let ch = max, next = null; // next: 回復中のチャージが戻る時刻
+  for (const e of list) {
+    while (next != null && next <= e.t + 1e-6) { ch++; next = ch < max ? next + r : null; }
+    if (ch <= 0) { st.clash.add(e.uid); st.until.set(e.uid, next); st.left.set(e.uid, 0); continue; }
+    ch--;
+    if (next == null) next = e.t + r;
+    // いま使ったチャージは、回復待ちの列のいちばん後ろで戻る
+    st.until.set(e.uid, next + (max - ch - 1) * r);
+    st.left.set(e.uid, ch);
   }
-  return {clash, until, left};
+  return st;
+}
+// その人がそのスキルを時刻 t に置けるか：t にチャージが残っていて、置いてもあとの使用がチャージ切れにならないこと
+function canUseAt(casterId, mitId, t){
+  const def = MIT[mitId];
+  if (!def || !(def.r > 0)) return true;
+  const same = plan.filter(e => !e.custom && entryLive(e) && e.caster === casterId && e.mitId === mitId);
+  const st0 = chargeSim([...same], def, {clash:new Set(), until:new Map(), left:new Map()});
+  const st1 = chargeSim([...same, {uid:'__new', t}], def, {clash:new Set(), until:new Map(), left:new Map()});
+  return !st1.clash.has('__new') && st1.clash.size <= st0.clash.size;
 }
 
 function renderTimeline(vis){
