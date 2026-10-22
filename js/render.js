@@ -253,6 +253,7 @@ function renderTable(vis){
   tb.innerHTML = vis.map(ev => {
     const c = ev.c, w = ev.worst;
     const pill = ev.status === 'none' ? '<span class="pill none">サンプルなし</span>'
+      : ev.status === 'immune' ? '<span class="pill ok" title="ログでは被弾直前のHP以上のダメージを受けて生き残っています（ツールにない無敵・ギミック）">ログでは無効</span>'
       : ev.status === 'bad' ? `<span class="pill bad">戦闘不能 ${ev.rows.filter(r => r.left != null && r.left <= 0).length}人</span>`
       : ev.status === 'warn' ? '<span class="pill warn">ギリギリ</span>' : '<span class="pill ok">生存</span>';
     const mits = ev.shown.map(e => { const d = defOf(e); const r = rateOf(d, ev.type);
@@ -281,7 +282,7 @@ function renderTable(vis){
           <td class="num">${r.afterDef == null ? '—' : fmt(r.afterDef)}</td>
           <td class="num">${((1 - r.mit) * 100).toFixed(1)}%</td>
           <td class="num">${r.dmg == null ? '—' : fmt(r.dmg)}</td>
-          <td class="num" style="color:${r.left == null ? 'inherit' : r.left <= 0 ? 'var(--bad)' : r.leftPct < 15 ? 'var(--warn)' : 'inherit'}">${r.left == null ? '—' : r.left <= 0 ? '0' : fmt(r.left)}</td>
+          <td class="num" style="color:${r.left == null ? 'inherit' : r.left <= 0 ? 'var(--bad)' : r.leftPct < 15 ? 'var(--warn)' : 'inherit'}">${r.left == null ? '—' : r.immune ? '<span class="sub" title="ログでは被弾直前のHP以上のダメージを受けて生き残っています（ツールにない無敵・ギミック）">ログでは無効</span>' : r.left <= 0 ? '0' : fmt(r.left)}</td>
           <td class="num sub">${r.actual == null ? '—' : fmt(r.actual)}</td></tr>`).join('') +
         `</tbody></table></div><p class="note">元ダメ（防御前）は防御力を計上する前の値で、ログの元ダメージを、受けた人のジョブの装備プリセットの防御力で割り戻したものです。防御後はそこにメンバーの防御力を掛けた値、軽減は軽減スキル・タンク特性・不屈の分、予測被ダメは両方を掛けた値です。「ログ上の実ダメ」は実際の戦闘で受けたダメージ（バリア吸収分を含む）です。ログに対応するプレイヤーがいないメンバーは、全体攻撃のときだけ中央値で計算します。${c.from != null ? ` この攻撃はバリアで全員の元ダメージが取れなかったため、同じ敵の同じ攻撃（${fmtT(c.from / 1000)}）の値を使っています。` : ''}</p></td></tr>`;
     }

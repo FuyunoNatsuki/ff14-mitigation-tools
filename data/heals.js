@@ -63,6 +63,13 @@ const HEALS = [
   {id:'waltz',    abbr:'ワル', name:'癒やしのワルツ',             jobs:['DNC'], kind:'party',  d:3,  r:60,  heal:300},
   {id:'minne',    abbr:'ミン', name:'地神のミンネ',             jobs:['BRD'], kind:'party',  d:15, r:120, recv:0.15, buffDur:15},
   {id:'mantra',   abbr:'マン', name:'マントラ',                 jobs:['MNK'], kind:'party',  d:15, r:90,  recv:0.1, buffDur:15},
+  // DPS の自己バリア・パーティバリア（最大HPに対する割合）
+  {id:'crest',    abbr:'クレ', name:'アルケインクレスト',         jobs:['RPR'], kind:'self',   d:5,  r:30,  shield:{hpPct:0.10, of:'target'}, shieldDur:5},
+  {id:'improv',   abbr:'イン', name:'インプロビゼーション・フィニッシュ', jobs:['DNC'], kind:'party', d:30, r:120, shield:{hpPct:0.10, of:'target'}, shieldDur:30},
+  {id:'tcoat',    abbr:'コト', name:'テンペラコート',             jobs:['PCT'], kind:'self',   d:10, r:120, shield:{hpPct:0.20, of:'target'}, shieldDur:10},
+  {id:'tgrassa',  abbr:'グラ', name:'テンペラグラッサ',           jobs:['PCT'], kind:'party',  d:10, r:120, shield:{hpPct:0.10, of:'target'}, shieldDur:10},
+  {id:'aegis',    abbr:'守光', name:'守りの光',                   jobs:['SMN'], kind:'self',   d:30, r:60,  shield:{hpPct:0.20, of:'target'}, shieldDur:30, charges:2},
+  {id:'manaward', abbr:'マバ', name:'マバリア',                   jobs:['BLM'], kind:'self',   d:20, r:120, shield:{hpPct:0.30, of:'target'}, shieldDur:20},
   {id:'secondwind',abbr:'内丹', name:'内丹',                    jobs:['MNK','DRG','NIN','SAM','RPR','VPR','BRD','MCH','DNC'], kind:'self', d:3, r:120, heal:800},
 ];
 

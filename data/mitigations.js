@@ -37,4 +37,16 @@ const MITS = [
   {id:'samba',     abbr:'サン', name:'守りのサンバ',             p:15,m:15,d:15,r:90, kind:'party', jobs:['DNC']},
   {id:'addle',     abbr:'アド', name:'アドル',                   p:5, m:10,d:15,r:90, kind:'party', jobs:['BLM','SMN','RDM','PCT']},
   {id:'barrier',   abbr:'バリ', name:'バマジク',           p:0, m:10,d:10,r:120,kind:'party', jobs:['RDM']},
+  {id:'expedient', abbr:'疾風', name:'疾風怒濤の計',             p:10,m:10,d:20,r:120,kind:'party', jobs:['SCH']},
+  {id:'sunsign',   abbr:'サン', name:'サンサイン',               p:10,m:10,d:15,r:120,kind:'party', jobs:['AST']},
+  // 無敵（HP が 1 より減らない・ダメージを無効化する）。被ダメージ 100% 軽減として扱う
+  {id:'holmgang',  abbr:'ホル', name:'ホルムギャング',           p:100,m:100,d:10,r:240,kind:'self', jobs:['WAR']},
+  {id:'livingdead',abbr:'リビ', name:'リビングデッド',           p:100,m:100,d:10,r:300,kind:'self', jobs:['DRK']},
+  {id:'hallowed',  abbr:'イン', name:'インビンシブル',           p:100,m:100,d:10,r:420,kind:'self', jobs:['PLD']},
+  {id:'bolide',    abbr:'ボラ', name:'ボーライド',               p:100,m:100,d:10,r:360,kind:'self', jobs:['GNB']},
+  // タンクのリミットブレイク（LB3）：パーティの被ダメージを 80% 軽減。リキャストはない（ゲージ次第）
+  {id:'lb3pld',    abbr:'LB3', name:'ラストバスティオン',         p:80,m:80,d:12,r:0, kind:'party', jobs:['PLD']},
+  {id:'lb3war',    abbr:'LB3', name:'原初の大地',                 p:80,m:80,d:12,r:0, kind:'party', jobs:['WAR']},
+  {id:'lb3drk',    abbr:'LB3', name:'ダークフォース',             p:80,m:80,d:12,r:0, kind:'party', jobs:['DRK']},
+  {id:'lb3gnb',    abbr:'LB3', name:'ソウルガンメタル',           p:80,m:80,d:12,r:0, kind:'party', jobs:['GNB']},
 ];

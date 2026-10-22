@@ -87,6 +87,7 @@ $('partyBonus').addEventListener('change', e => { settings.partyBonus = e.target
 // ログを読み込むときの軽減（今のプランの軽減 / ログで実際に使われた軽減）
 $('mitSource').addEventListener('change', e => { settings.mitSource = e.target.value === 'log' ? 'log' : 'plan'; saveSettings(); });
 $('hpSim').addEventListener('change', e => { settings.hpSim = e.target.checked; saveSettings(); renderAll(); });
+$('hpFromLog').addEventListener('change', e => { settings.hpFromLog = e.target.checked; saveSettings(); renderAll(); });
 $('critExp').addEventListener('change', e => { settings.critExp = e.target.checked; saveSettings(); renderAll(); });
 // タブ（軽減 / ヒール・バリア）の切り替え
 for (const b of document.querySelectorAll('.tab')) b.addEventListener('click', () => { settings.tab = b.dataset.tab; selEntry = null; saveSettings(); renderAll(); });

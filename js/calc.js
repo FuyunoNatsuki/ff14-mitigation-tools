@@ -26,8 +26,10 @@ function evalCast(c){
   const hitIds = new Set();
   for (const m of activeMembers()) {
     const x = m.pid >= 0 ? byPid.get(m.pid) : null;
-    let raw, est = false, n = 1, actual = null;
-    if (x) { raw = ovr != null ? ovr : x.raw; est = ovr == null && x.est; n = x.n; actual = x.actual; }
+    let raw, est = false, n = 1, actual = null, logHpBefore = null, logImmune = false;
+    if (x) { raw = ovr != null ? ovr : x.raw; est = ovr == null && x.est; n = x.n; actual = x.actual; logHpBefore = x.hpb == null ? null : x.hpb; logImmune = !!x.sv; }
+    // ログのプレイヤーに対応しているメンバーは、ログで当たっていない攻撃は受けない
+    else if (logPlayer(m)) continue;
     // ログに対応するプレイヤーがいないメンバーは、全体攻撃なら当たったものとして扱う
     else if (aoe) { raw = ovr != null ? ovr : median; est = ovr == null; }
     else continue;
@@ -40,14 +42,17 @@ function evalCast(c){
     const dm = defMul(m, type), mul = mit * dm;
     const dmg = raw == null ? null : Math.floor(raw * mul);
     const hp = hpOf(m);
-    const left = dmg == null ? null : hp - dmg;
-    const row = {m, raw, estimated:est, nHits:n, actual, mit, defVal:defValueOf(m, type), defMul:dm, afterDef:raw == null ? null : Math.floor(raw * dm),
+    // ログでは被弾直前の HP 以上のダメージを受けて生き残っている（ツールにない無敵・ギミック）：「HPをログに合わせる」のときは戦闘不能に数えない
+    const immune = logImmune && settings.hpFromLog !== false;
+    const left = dmg == null ? null : immune ? hp : hp - dmg;
+    const row = {m, raw, estimated:est, nHits:n, actual, logHpBefore, immune, mit, defVal:defValueOf(m, type), defMul:dm, afterDef:raw == null ? null : Math.floor(raw * dm),
       mul, dmg, hp, left, leftPct:left == null ? null : left / hp * 100};
     rows.push(row);
     if (actual != null) maxActual = Math.max(maxActual, actual);
-    if (raw != null) { maxRaw = Math.max(maxRaw, raw); maxDmg = Math.max(maxDmg, dmg); if (!worst || row.leftPct < worst.leftPct) worst = row; }
+    if (raw != null) { maxRaw = Math.max(maxRaw, raw); maxDmg = Math.max(maxDmg, dmg); if (!immune && (!worst || row.leftPct < worst.leftPct)) worst = row; }
   }
-  const status = !worst ? 'none' : worst.left <= 0 ? 'bad' : worst.leftPct < 15 ? 'warn' : 'ok';
+  // 当たった全員が「ログでは無効」のときは immune（戦闘不能にもサンプルなしにもしない）
+  const status = !worst ? (rows.some(r => r.immune) ? 'immune' : 'none') : worst.left <= 0 ? 'bad' : worst.leftPct < 15 ? 'warn' : 'ok';
   // 表に出す元ダメージ：防御力を計上する前の値に、当たったメンバーのうち防御力がいちばん低い人・高い人の防御力を掛けたもの
   const base = ovr != null ? ovr : logMax;
   let defLo = null, defHi = null;

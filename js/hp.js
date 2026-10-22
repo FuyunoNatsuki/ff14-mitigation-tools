@@ -105,8 +105,10 @@ function simulateHp(evals){
       const snap = new Map();
       for (const r of rows) {
         const s = st.get(r.m.id);
+        // 「HPをログに合わせる」：ログに被弾直前の HP があれば、その HP から受ける（ツールにない回復の分を埋める）
+        if (settings.hpFromLog !== false && r.logHpBefore != null) { s.hp = Math.min(s.max, r.logHpBefore); s.dead = false; }
         const before = {hpBefore:s.hp, shieldBefore:shieldTotal(s, t), dead:s.dead};
-        if (!s.dead) {
+        if (!s.dead && !r.immune) {
           let dmg = r.dmg;
           for (const sh of s.shields) { if (sh.exp <= t || dmg <= 0) continue; const a = Math.min(sh.amt, dmg); sh.amt -= a; dmg -= a; }
           s.shields = s.shields.filter(sh => sh.amt > 0 && sh.exp > t);
@@ -117,6 +119,8 @@ function simulateHp(evals){
         }
         snap.set(r.m.id, {...before, hpAfter:s.hp, deadAfter:s.dead});
         record(r.m.id, t);
+        // 戦闘不能はこの攻撃の判定にだけ出す。あとの攻撃の判定に引きずらないよう、HP を満タンに戻して続ける
+        if (s.dead) { s.dead = false; s.hp = s.max; s.shields = []; s.triggers = []; record(r.m.id, t + 0.001); }
       }
       at.set(ev.c.id, snap);
     }});
@@ -211,10 +215,11 @@ function applyHpSim(evals, sim){
       const s = snap && snap.get(r.m.id);
       if (!s || r.dmg == null) continue;
       r.hpBefore = s.hpBefore; r.shieldBefore = s.shieldBefore; r.wasDead = s.dead;
-      r.left = s.dead ? 0 : s.hpBefore - Math.max(0, r.dmg - s.shieldBefore);
+      r.left = r.immune ? s.hpBefore : s.dead ? 0 : s.hpBefore - Math.max(0, r.dmg - s.shieldBefore);
       r.leftPct = r.left / r.hp * 100;
-      if (!worst || r.leftPct < worst.leftPct) worst = r;
+      if (!r.immune && (!worst || r.leftPct < worst.leftPct)) worst = r;
     }
     if (worst) { ev.worst = worst; ev.status = worst.left <= 0 ? 'bad' : worst.leftPct < 15 ? 'warn' : 'ok'; }
+    else if (ev.rows.some(r => r.immune)) { ev.worst = null; ev.status = 'immune'; }
   }
 }
