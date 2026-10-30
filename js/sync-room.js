@@ -3,7 +3,7 @@
 
 // ----- URLで共有するルーム（中継サーバーの REST とストリーミング）-----
 // ブラウザがつなぐのは中継サーバー（worker/ の Cloudflare Worker）だけ。データベースのURLは中継の中にしかない。
-const ROOM_API = 'https://mitigation-planner-rooms.mitigation-planner-rooms.workers.dev';
+const ROOM_API = 'https://mitigation-planner-rooms.natsuki-tools.workers.dev';
 // tl: 自分が表示している TL（'' はルーム直下の TL。追加した TL は tls/<ID> の下）
 const Room = {db:null, id:null, es:null, mirror:{}, clientId:uid(), hb:null, fightVer:null, baseTypes:{}, peers:[], connected:false, syncTimer:null, tl:''};
 const validTlId = id => /^[a-z0-9]{6,16}$/.test(String(id || ''));
